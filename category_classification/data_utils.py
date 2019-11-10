@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn.preprocessing import MultiLabelBinarizer
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
-from tf.models import TextPreprocessingConfig
+from category_classification.models import TextPreprocessingConfig
 from utils.constant import UNK_TOKEN
 from utils.preprocess import generate_y, tokenize, preprocess_product_name
 

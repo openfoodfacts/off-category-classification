@@ -13,7 +13,7 @@ from utils.io import load_config, load_product_name_vocabulary, load_category_vo
     save_json
 from utils.metrics import evaluation_report
 from utils.preprocess import get_nlp
-from tf.data_utils import generate_data_from_df
+from category_classification.data_utils import generate_data_from_df
 
 
 import os

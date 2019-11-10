@@ -9,7 +9,7 @@ from robotoff.utils import gzip_jsonl_iter
 from tensorflow import keras
 
 import settings
-from tf.data_utils import generate_data_from_df
+from category_classification.data_utils import generate_data_from_df
 from utils.error_analysis import generate_analysis_model, get_deepest_categories, get_interactive_embedding_plot, \
     get_error_category
 

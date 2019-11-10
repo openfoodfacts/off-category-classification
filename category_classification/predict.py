@@ -10,7 +10,7 @@ import settings
 from utils.io import load_config, load_product_name_vocabulary, load_category_vocabulary, load_ingredient_vocabulary
 from utils.metrics import fill_ancestors
 from utils.preprocess import get_nlp
-from tf.data_utils import generate_data
+from category_classification.data_utils import generate_data
 
 import os
 
