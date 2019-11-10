@@ -11,8 +11,8 @@ from tensorflow.keras import callbacks
 from tensorflow import keras
 
 import settings
-from tf.data_utils import generate_data_from_df
-from tf.models import build_model, Config
+from category_classification.data_utils import generate_data_from_df
+from category_classification.models import build_model, Config
 from utils.io import save_product_name_vocabulary, save_config, save_category_vocabulary, save_ingredient_vocabulary, \
     save_json
 from utils.metrics import evaluation_report
