@@ -23,6 +23,7 @@ from utils.preprocess import count_categories, count_ingredients, get_nlp, token
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('config', type=pathlib.Path)
+    parser.add_argument('output_dir', type=pathlib.Path)
     return parser.parse_args()
 
 
@@ -34,8 +35,8 @@ with args.config.open('r') as f:
 
 model_config = config.model_config
 
-save_dir = settings.WEIGHTS_DIR / config.train_config.save_dirname
-save_dir.mkdir()
+save_dir = args.output_dir / config.train_config.save_dirname
+save_dir.mkdir(parents=True, exist_ok=True)
 
 category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
 ingredient_taxonomy = Taxonomy.from_json(settings.INGREDIENTS_TAXONOMY_PATH)
