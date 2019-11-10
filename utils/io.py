@@ -6,7 +6,7 @@ from typing import Dict
 import dacite
 
 import settings
-from tf.models import Config
+from category_classification.models import Config
 
 
 def save_product_name_vocabulary(token_to_int: Dict[str, int],
