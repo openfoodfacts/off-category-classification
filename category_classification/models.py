@@ -12,6 +12,7 @@ class TrainConfig:
     batch_size: int
     epochs: int
     name: str
+    lr: float
     label_smoothing: float = 0
 
 

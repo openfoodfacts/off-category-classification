@@ -101,7 +101,8 @@ print("Selected vocabulary: {}".format(len(product_name_to_int)))
 
 model = build_model(model_config)
 loss_fn = keras.losses.BinaryCrossentropy(label_smoothing=config.train_config.label_smoothing)
-model.compile(optimizer='adam',
+optimizer = keras.optimizers.Adam(learning_rate=config.train_config.lr)
+model.compile(optimizer=optimizer,
               loss=loss_fn,
               metrics=['binary_accuracy', 'Precision', 'Recall'])
 

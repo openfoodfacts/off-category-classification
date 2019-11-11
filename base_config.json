@@ -8,7 +8,7 @@
     "train_config": {
         "batch_size": 128,
         "epochs": 50,
-        "save_dirname": "baseline",
+        "lr": 0.001,
         "label_smoothing": 0.0
     },
     "model_config": {
