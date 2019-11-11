@@ -168,7 +168,7 @@ print("Training ended")
 
 log_dir = save_dir / 'logs'
 print("Moving log directory from {} to {}".format(temporary_log_dir, log_dir))
-shutil.copy(str(temporary_log_dir), str(log_dir))
+shutil.move(str(temporary_log_dir), str(log_dir))
 
 model.save(str(save_dir / 'last_checkpoint.hdf5'))
 
