@@ -156,7 +156,6 @@ model.fit(X_train, y_train,
               callbacks.TensorBoard(
                   log_dir=str(temporary_log_dir),
                   histogram_freq=2,
-                  write_grads=True,
               ),
               callbacks.EarlyStopping(
                   monitor='val_loss',
