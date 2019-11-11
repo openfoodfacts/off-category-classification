@@ -3,6 +3,7 @@ import functools
 import json
 import os
 import pathlib
+import tempfile
 
 import dacite
 import pandas as pd
@@ -138,6 +139,9 @@ X_train, y_train = generate_data_partial(train_df)
 X_val, y_val = generate_data_partial(val_df)
 
 print("Starting training...")
+temporary_log_dir = pathlib.Path(tempfile.mkdtemp())
+print("Temporary log directory: {}".format(temporary_log_dir))
+
 model.fit(X_train, y_train,
           batch_size=config.train_config.batch_size,
           epochs=config.train_config.epochs,
@@ -150,7 +154,7 @@ model.fit(X_train, y_train,
                   save_best_only=True,
               ),
               callbacks.TensorBoard(
-                  log_dir=str(save_dir / 'logs'),
+                  log_dir=str(temporary_log_dir),
                   histogram_freq=2,
                   write_grads=True,
               ),
@@ -160,6 +164,11 @@ model.fit(X_train, y_train,
               ),
           ])
 print("Training ended")
+
+log_dir = save_dir / 'logs'
+print("Moving log directory from {} to {}".format(temporary_log_dir, log_dir))
+temporary_log_dir.replace(log_dir)
+
 model.save(str(save_dir / 'last_checkpoint.hdf5'))
 
 last_checkpoint_path = sorted(save_dir.glob('weights.*.hdf5'))[-1]
