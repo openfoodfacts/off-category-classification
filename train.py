@@ -18,7 +18,7 @@ from category_classification.data_utils import generate_data_from_df
 from category_classification.models import build_model, Config, SingleNodeStrategy
 from utils import update_dict_dot
 from utils.io import save_product_name_vocabulary, save_config, save_category_vocabulary, save_ingredient_vocabulary, \
-    save_json
+    save_json, copy_category_taxonomy
 from utils.metrics import evaluation_report
 from utils.preprocess import count_categories, count_ingredients, get_nlp, tokenize_batch, extract_vocabulary, \
     preprocess_product_name
@@ -105,6 +105,7 @@ model_config.product_name_voc_size = len(product_name_to_int)
 save_product_name_vocabulary(product_name_to_int,
                              save_dir)
 save_config(config, save_dir)
+copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
 
 print("Selected vocabulary: {}".format(len(product_name_to_int)))
 

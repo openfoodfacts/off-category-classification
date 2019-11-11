@@ -17,4 +17,5 @@ INGREDIENTS_TAXONOMY_PATH = DATA_DIR / 'ingredients.full.json'
 PRODUCT_NAME_VOC_NAME = "product_name_voc.json"
 CONFIG_NAME = 'config.json'
 CATEGORY_VOC_NAME = 'category_voc.json'
+CATEGORY_TAXONOMY_NAME = 'category_taxonomy.json'
 INGREDIENT_VOC_NAME = 'ingredient_voc.json'

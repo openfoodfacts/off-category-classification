@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import pathlib
+import shutil
 from typing import Dict
 
 import dacite
@@ -25,6 +26,11 @@ def save_category_vocabulary(category_to_int: Dict[str, int],
 
 def load_category_vocabulary(model_dir: pathlib.Path):
     return load_json(model_dir / settings.CATEGORY_VOC_NAME)
+
+
+def copy_category_taxonomy(taxonomy_path: pathlib.Path,
+                           model_dir: pathlib.Path):
+    shutil.copy(str(taxonomy_path), str(model_dir / settings.CATEGORY_TAXONOMY_NAME))
 
 
 def save_ingredient_vocabulary(ingredient_to_int: Dict[str, int],
