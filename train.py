@@ -1,18 +1,20 @@
 import argparse
 import functools
 import json
+import os
 import pathlib
 
 import dacite
 import pandas as pd
 from robotoff.taxonomy import Taxonomy
 from robotoff.utils import gzip_jsonl_iter
+import tensorflow as tf
 from tensorflow.keras import callbacks
 from tensorflow import keras
 
 import settings
 from category_classification.data_utils import generate_data_from_df
-from category_classification.models import build_model, Config
+from category_classification.models import build_model, Config, SingleNodeStrategy
 from utils import update_dict_dot
 from utils.io import save_product_name_vocabulary, save_config, save_category_vocabulary, save_ingredient_vocabulary, \
     save_json
@@ -26,6 +28,7 @@ def parse_args():
     parser.add_argument('config', type=pathlib.Path)
     parser.add_argument('output_dir', type=pathlib.Path)
     parser.add_argument('--extra-params', help="extra parameters updating the base configuration")
+    parser.add_argument('--tpu', type=bool, default=False, help="activate TPU training on Google Colab")
     return parser.parse_args()
 
 
@@ -101,12 +104,23 @@ save_config(config, save_dir)
 
 print("Selected vocabulary: {}".format(len(product_name_to_int)))
 
-model = build_model(model_config)
-loss_fn = keras.losses.BinaryCrossentropy(label_smoothing=config.train_config.label_smoothing)
-optimizer = keras.optimizers.Adam(learning_rate=config.train_config.lr)
-model.compile(optimizer=optimizer,
-              loss=loss_fn,
-              metrics=['binary_accuracy', 'Precision', 'Recall'])
+if args.tpu:
+    tpu_address = 'grpc://' + os.environ['COLAB_TPU_ADDR']
+    cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
+        tpu=tpu_address)
+    tf.config.experimental_connect_to_cluster(cluster_resolver)
+    tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
+    strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
+else:
+    strategy = SingleNodeStrategy()
+
+with strategy.scope():
+    model = build_model(model_config)
+    loss_fn = keras.losses.BinaryCrossentropy(label_smoothing=config.train_config.label_smoothing)
+    optimizer = keras.optimizers.Adam(learning_rate=config.train_config.lr)
+    model.compile(optimizer=optimizer,
+                  loss=loss_fn,
+                  metrics=['binary_accuracy', 'Precision', 'Recall'])
 
 
 generate_data_partial = functools.partial(generate_data_from_df,
