@@ -11,7 +11,7 @@ from tensorflow.keras import layers
 class TrainConfig:
     batch_size: int
     epochs: int
-    save_dirname: str
+    name: str
     label_smoothing: float = 0
 
 

@@ -13,6 +13,7 @@ from tensorflow import keras
 import settings
 from category_classification.data_utils import generate_data_from_df
 from category_classification.models import build_model, Config
+from utils import update_dict_dot
 from utils.io import save_product_name_vocabulary, save_config, save_category_vocabulary, save_ingredient_vocabulary, \
     save_json
 from utils.metrics import evaluation_report
@@ -24,6 +25,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('config', type=pathlib.Path)
     parser.add_argument('output_dir', type=pathlib.Path)
+    parser.add_argument('--extra-params', help="extra parameters updating the base configuration")
     return parser.parse_args()
 
 
@@ -31,11 +33,15 @@ args = parse_args()
 
 with args.config.open('r') as f:
     config_dict = json.load(f)
-    config = dacite.from_dict(Config, config_dict)
+
+if args.extra_params:
+    update_dict_dot(config_dict, args.extra_params)
+
+config = dacite.from_dict(Config, config_dict)
 
 model_config = config.model_config
 
-save_dir = args.output_dir / config.train_config.save_dirname
+save_dir = args.output_dir
 save_dir.mkdir(parents=True, exist_ok=True)
 
 category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
