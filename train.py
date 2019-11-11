@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument('config', type=pathlib.Path)
     parser.add_argument('output_dir', type=pathlib.Path)
     parser.add_argument('--extra-params', help="extra parameters updating the base configuration")
-    parser.add_argument('--tpu', type=bool, default=False, help="activate TPU training on Google Colab")
+    parser.add_argument('--tpu', action="store_true", default=False, help="activate TPU training on Google Colab")
     return parser.parse_args()
 
 
@@ -36,6 +36,9 @@ args = parse_args()
 
 with args.config.open('r') as f:
     config_dict = json.load(f)
+
+if args.tpu:
+    print("TPU training enabled")
 
 if args.extra_params:
     print("Extra parameters: {}".format(args.extra_params))
