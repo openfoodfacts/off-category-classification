@@ -94,8 +94,9 @@ save_config(config, save_dir)
 print("Selected vocabulary: {}".format(len(product_name_to_int)))
 
 model = build_model(model_config)
+loss_fn = keras.losses.BinaryCrossentropy(label_smoothing=config.train_config.label_smoothing)
 model.compile(optimizer='adam',
-              loss='binary_crossentropy',
+              loss=loss_fn,
               metrics=['binary_accuracy', 'Precision', 'Recall'])
 
 

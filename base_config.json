@@ -8,7 +8,8 @@
     "train_config": {
         "batch_size": 128,
         "epochs": 50,
-        "save_dirname": "baseline"
+        "save_dirname": "baseline",
+        "label_smoothing": 0.0
     },
     "model_config": {
         "product_name_lstm_recurrent_dropout": 0.2,

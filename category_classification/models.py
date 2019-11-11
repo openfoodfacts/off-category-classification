@@ -12,6 +12,7 @@ class TrainConfig:
     batch_size: int
     epochs: int
     save_dirname: str
+    label_smoothing: float = 0
 
 
 @dataclasses.dataclass
