@@ -35,8 +35,10 @@ with args.config.open('r') as f:
     config_dict = json.load(f)
 
 if args.extra_params:
+    print("Extra parameters: {}".format(args.extra_params))
     update_dict_dot(config_dict, args.extra_params)
 
+print("Full configuration:\n{}".format(json.dumps(config_dict, indent=4)))
 config = dacite.from_dict(Config, config_dict)
 
 model_config = config.model_config
@@ -118,6 +120,7 @@ generate_data_partial = functools.partial(generate_data_from_df,
 X_train, y_train = generate_data_partial(train_df)
 X_val, y_val = generate_data_partial(val_df)
 
+print("Starting training...")
 model.fit(X_train, y_train,
           batch_size=config.train_config.batch_size,
           epochs=config.train_config.epochs,
@@ -139,7 +142,7 @@ model.fit(X_train, y_train,
                   patience=4,
               ),
           ])
-
+print("Training ended")
 model.save(str(save_dir / 'last_checkpoint.hdf5'))
 
 last_checkpoint_path = sorted(save_dir.glob('weights.*.hdf5'))[-1]
@@ -147,6 +150,7 @@ last_checkpoint_path = sorted(save_dir.glob('weights.*.hdf5'))[-1]
 print("Restoring last checkpoint {}".format(last_checkpoint_path))
 model = keras.models.load_model(str(last_checkpoint_path))
 
+print("Evaluating on validation dataset")
 y_pred_val = model.predict(X_val)
 report, clf_report = evaluation_report(y_val, y_pred_val,
                                        taxonomy=category_taxonomy,
