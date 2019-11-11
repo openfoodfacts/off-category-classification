@@ -2,6 +2,7 @@ import contextlib
 import dataclasses
 from typing import List, Optional
 
+import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
@@ -59,6 +60,7 @@ def build_model(config: ModelConfig) -> keras.Model:
             dropout=config.product_name_lstm_dropout,
         )
     )(product_name_embedding)
+    ingredient_input = tf.cast(ingredient_input, tf.float32)
     concat = layers.Concatenate()([ingredient_input, product_name_lstm])
 
     hidden = layers.Dense(config.hidden_dim)(concat)
