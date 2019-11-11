@@ -3,6 +3,7 @@ import functools
 import json
 import os
 import pathlib
+import shutil
 import tempfile
 
 import dacite
@@ -167,7 +168,7 @@ print("Training ended")
 
 log_dir = save_dir / 'logs'
 print("Moving log directory from {} to {}".format(temporary_log_dir, log_dir))
-temporary_log_dir.replace(log_dir)
+shutil.copy(str(temporary_log_dir), str(log_dir))
 
 model.save(str(save_dir / 'last_checkpoint.hdf5'))
 
