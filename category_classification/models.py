@@ -1,5 +1,6 @@
 import contextlib
 import dataclasses
+import datetime
 from typing import List, Optional
 
 import tensorflow as tf
@@ -13,6 +14,7 @@ class TrainConfig:
     epochs: int
     lr: float
     label_smoothing: float = 0
+    start_datetime: Optional[datetime.datetime] = None
 
 
 @dataclasses.dataclass
