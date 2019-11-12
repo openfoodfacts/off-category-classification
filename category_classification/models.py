@@ -65,11 +65,10 @@ def build_model(config: ModelConfig) -> keras.Model:
     )(product_name_embedding)
     ingredient_input = tf.cast(ingredient_input, tf.float32)
     concat = layers.Concatenate()([ingredient_input, product_name_lstm])
-
+    concat = layers.Dropout(config.hidden_dropout)(concat)
     hidden = layers.Dense(config.hidden_dim)(concat)
     hidden = layers.Dropout(config.hidden_dropout)(hidden)
     hidden = layers.Activation('relu')(hidden)
-
     output = layers.Dense(config.output_dim, activation='sigmoid')(hidden)
     return keras.Model(inputs=[ingredient_input, product_name_input], outputs=[output])
 
