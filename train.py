@@ -107,6 +107,7 @@ def train(train_data, val_data, test_data,
                       monitor='val_loss',
                       patience=4,
                   ),
+                  callbacks.CSVLogger(str(save_dir / "training.log")),
               ])
     print("Training ended")
 
@@ -228,3 +229,7 @@ def main():
               (X_val, y_val),
               (X_test, y_test),
               model, save_dir, config, category_taxonomy, category_names)
+
+
+if __name__ == "__main__":
+    main()
