@@ -33,7 +33,8 @@ def parse_args():
     parser.add_argument('output_dir', type=pathlib.Path)
     parser.add_argument('--extra-params', help="extra parameters updating the base configuration")
     parser.add_argument('--tpu', action="store_true", default=False, help="activate TPU training on Google Colab")
-    parser.add_argument('--repeat', type=int, default=1, choices=range(1, 50), help="number of replicates to run")
+    parser.add_argument('--repeat', type=int, default=1, help="number of replicates to run")
+    parser.add_argument('--lang', type=str, default='fr')
     return parser.parse_args()
 
 
@@ -63,6 +64,8 @@ def get_config(args) -> Config:
     with args.config.open('r') as f:
         config_dict = json.load(f)
 
+    config_dict['lang'] = args.lang
+
     if args.tpu:
         print("TPU training enabled")
 
@@ -72,6 +75,15 @@ def get_config(args) -> Config:
 
     print("Full configuration:\n{}".format(json.dumps(config_dict, indent=4)))
     return dacite.from_dict(Config, config_dict)
+
+
+def create_dataframe(split: str, lang: str) -> pd.DataFrame:
+    if split not in ('train', 'test', 'val'):
+        raise ValueError("split must be either 'split', 'test' or 'val'")
+
+    file_name = "category_{}.{}.jsonl.gz".format(lang, split)
+    full_path = settings.DATA_DIR / file_name
+    return pd.DataFrame(gzip_jsonl_iter(full_path))
 
 
 def train(train_data, val_data, test_data,
@@ -151,9 +163,9 @@ def main():
     category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
     ingredient_taxonomy = Taxonomy.from_json(settings.INGREDIENTS_TAXONOMY_PATH)
 
-    train_df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_FR_TRAIN_PATH))
-    test_df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_FR_TEST_PATH))
-    val_df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_FR_VAL_PATH))
+    train_df = create_dataframe('train', args.lang)
+    test_df = create_dataframe('test', args.lang)
+    val_df = create_dataframe('val', args.lang)
 
     categories_count = count_categories(train_df)
     ingredients_count = count_ingredients(train_df)
@@ -176,7 +188,8 @@ def main():
     category_to_id = {name: idx for idx, name in enumerate(category_names)}
     ingredient_to_id = {name: idx for idx, name in enumerate(ingredient_names)}
 
-    nlp = get_nlp(lang=config.lang)
+    nlp_lang = 'en' if config.lang == 'xx' else config.lang
+    nlp = get_nlp(lang=nlp_lang)
 
     preprocess_product_name_func = functools.partial(preprocess_product_name,
                                                      lower=config.product_name_preprocessing_config.lower,
@@ -211,7 +224,7 @@ def main():
 
     for i, save_dir in enumerate(save_dirs):
         model = create_model(args.tpu, config)
-        save_dir.mkdir()
+        save_dir.mkdir(exist_ok=True)
         config.train_config.start_datetime = str(datetime.datetime.utcnow())
         print("Starting training repeat {}".format(i))
         save_product_name_vocabulary(product_name_to_int,
