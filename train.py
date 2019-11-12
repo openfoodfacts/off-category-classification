@@ -107,7 +107,7 @@ def train(train_data, val_data, test_data,
                       monitor='val_loss',
                       patience=4,
                   ),
-                  callbacks.CSVLogger(str(save_dir / "training.log")),
+                  callbacks.CSVLogger(str(save_dir / "training.csv")),
               ])
     print("Training ended")
 
@@ -195,8 +195,6 @@ def main():
 
     print("Selected vocabulary: {}".format(len(product_name_to_int)))
 
-    model = create_model(args.tpu, config)
-
     generate_data_partial = functools.partial(generate_data_from_df,
                                               ingredient_to_id=ingredient_to_id,
                                               category_to_id=category_to_id,
@@ -211,9 +209,11 @@ def main():
     else:
         save_dirs = [output_dir / str(i) for i in range(replicates)]
 
-    for save_dir in save_dirs:
-        config.train_config.start_timestamp = str(datetime.datetime.utcnow())
-        print("Starting training repeat {}".format(replicates))
+    for i, save_dir in enumerate(save_dirs):
+        model = create_model(args.tpu, config)
+        save_dir.mkdir()
+        config.train_config.start_datetime = str(datetime.datetime.utcnow())
+        print("Starting training repeat {}".format(i))
         save_product_name_vocabulary(product_name_to_int,
                                      save_dir)
         save_config(config, save_dir)
@@ -229,6 +229,11 @@ def main():
               (X_val, y_val),
               (X_test, y_test),
               model, save_dir, config, category_taxonomy, category_names)
+
+        config.train_config.end_datetime = str(datetime.datetime.utcnow())
+        save_config(config, save_dir)
+        config.train_config.start_datetime = None
+        config.train_config.end_datetime = None
 
 
 if __name__ == "__main__":

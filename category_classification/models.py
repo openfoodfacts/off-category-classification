@@ -15,6 +15,7 @@ class TrainConfig:
     lr: float
     label_smoothing: float = 0
     start_datetime: Optional[datetime.datetime] = None
+    end_datetime: Optional[datetime.datetime] = None
 
 
 @dataclasses.dataclass
