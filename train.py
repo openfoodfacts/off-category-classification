@@ -188,8 +188,7 @@ def main():
     category_to_id = {name: idx for idx, name in enumerate(category_names)}
     ingredient_to_id = {name: idx for idx, name in enumerate(ingredient_names)}
 
-    nlp_lang = 'en' if config.lang == 'xx' else config.lang
-    nlp = get_nlp(lang=nlp_lang)
+    nlp = get_nlp(lang=config.lang)
 
     preprocess_product_name_func = functools.partial(preprocess_product_name,
                                                      lower=config.product_name_preprocessing_config.lower,

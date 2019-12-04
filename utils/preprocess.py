@@ -83,6 +83,8 @@ def tokenize_batch(texts: Iterable[str], nlp) -> Iterable[Iterable[str]]:
 
 
 def get_nlp(lang: str):
+    lang = 'en' if lang == 'xx' else lang
+
     if lang == 'fr':
         return French()
     elif lang == 'en':
