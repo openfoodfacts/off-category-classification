@@ -3,12 +3,23 @@ from typing import Dict, Iterable
 
 import numpy as np
 import pandas as pd
+from robotoff.utils import gzip_jsonl_iter
 from sklearn.preprocessing import MultiLabelBinarizer
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
 from category_classification.models import TextPreprocessingConfig
+import settings
 from utils.constant import UNK_TOKEN
 from utils.preprocess import generate_y, tokenize, preprocess_product_name
+
+
+def create_dataframe(split: str, lang: str) -> pd.DataFrame:
+    if split not in ('train', 'test', 'val'):
+        raise ValueError("split must be either 'split', 'test' or 'val'")
+
+    file_name = "category_{}.{}.jsonl.gz".format(lang, split)
+    full_path = settings.DATA_DIR / file_name
+    return pd.DataFrame(gzip_jsonl_iter(full_path))
 
 
 def generate_data_from_df(df: pd.DataFrame,

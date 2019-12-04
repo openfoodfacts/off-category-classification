@@ -2,19 +2,15 @@ import argparse
 import operator
 import pathlib
 
-import pandas as pd
 from robotoff.taxonomy import Taxonomy
 from tensorflow import keras
-
-from robotoff.utils import gzip_jsonl_iter
 
 import settings
 from utils.io import load_config, load_product_name_vocabulary, load_category_vocabulary, load_ingredient_vocabulary, \
     save_json
 from utils.metrics import evaluation_report
 from utils.preprocess import get_nlp
-from category_classification.data_utils import generate_data_from_df
-
+from category_classification.data_utils import generate_data_from_df, create_dataframe
 
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -25,6 +21,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('model_path', type=pathlib.Path)
     parser.add_argument('--type', default='val', choices=['test', 'val'])
+    parser.add_argument('--output-prefix', default='')
+    parser.add_argument('--lang')
     return parser.parse_args()
 
 
@@ -47,10 +45,7 @@ model = keras.models.load_model(str(model_path))
 
 eval_type = args.type
 
-if eval_type == 'val':
-    df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_FR_VAL_PATH))
-else:
-    df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_FR_TEST_PATH))
+df = create_dataframe(eval_type, args.lang if args.lang else config.lang)
 
 X, y = generate_data_from_df(df,
                              ingredient_to_id,
@@ -68,5 +63,9 @@ report, clf_report = evaluation_report(y, y_pred,
                                        taxonomy=category_taxonomy,
                                        category_names=category_names)
 
-save_json(report, model_dir / 'metrics_{}.json'.format(eval_type))
-save_json(clf_report, model_dir / 'classification_report_{}.json'.format(eval_type))
+output_prefix = args.output_prefix
+if output_prefix:
+    output_prefix += '_'
+
+save_json(report, model_dir / '{}metrics_{}.json'.format(output_prefix, eval_type))
+save_json(clf_report, model_dir / '{}classification_report_{}.json'.format(output_prefix, eval_type))

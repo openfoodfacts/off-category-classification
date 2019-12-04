@@ -9,15 +9,13 @@ import tempfile
 from typing import List
 
 import dacite
-import pandas as pd
 from robotoff.taxonomy import Taxonomy
-from robotoff.utils import gzip_jsonl_iter
 import tensorflow as tf
 from tensorflow.keras import callbacks
 from tensorflow import keras
 
 import settings
-from category_classification.data_utils import generate_data_from_df
+from category_classification.data_utils import generate_data_from_df, create_dataframe
 from category_classification.models import build_model, Config, SingleNodeStrategy
 from utils import update_dict_dot
 from utils.io import save_product_name_vocabulary, save_config, save_category_vocabulary, save_ingredient_vocabulary, \
@@ -75,15 +73,6 @@ def get_config(args) -> Config:
 
     print("Full configuration:\n{}".format(json.dumps(config_dict, indent=4)))
     return dacite.from_dict(Config, config_dict)
-
-
-def create_dataframe(split: str, lang: str) -> pd.DataFrame:
-    if split not in ('train', 'test', 'val'):
-        raise ValueError("split must be either 'split', 'test' or 'val'")
-
-    file_name = "category_{}.{}.jsonl.gz".format(lang, split)
-    full_path = settings.DATA_DIR / file_name
-    return pd.DataFrame(gzip_jsonl_iter(full_path))
 
 
 def train(train_data, val_data, test_data,
