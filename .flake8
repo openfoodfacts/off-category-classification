@@ -1,0 +1,9 @@
+[flake8]
+ignore=E203,E231,W503
+max-line-length=88
+max-doc-length=79
+exclude=
+    .git
+import-order-style=appnexus
+inline-quotes=double
+application-import-names=category_classification,settings,utils
