@@ -10,7 +10,7 @@ from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 from category_classification.models import TextPreprocessingConfig
 import settings
 from utils.constant import UNK_TOKEN
-from utils.preprocess import generate_y, tokenize, preprocess_product_name
+from utils.preprocess import generate_y, preprocess_product_name, tokenize
 
 
 def create_dataframe(split: str, lang: str) -> pd.DataFrame:
