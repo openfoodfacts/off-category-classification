@@ -15,7 +15,7 @@ from utils.preprocess import generate_y, preprocess_product_name, tokenize
 
 def create_dataframe(split: str, lang: str) -> pd.DataFrame:
     if split not in ("train", "test", "val"):
-        raise ValueError("split must be either 'split', 'test' or 'val'")
+        raise ValueError("split must be either 'train', 'test' or 'val'")
 
     file_name = "category_{}.{}.jsonl.gz".format(lang, split)
     full_path = settings.DATA_DIR / file_name
@@ -87,7 +87,7 @@ def process_product_name(
     token_to_int: Dict,
     max_length: int,
     preprocessing_config: TextPreprocessingConfig,
-):
+) -> np.ndarray:
     tokens_all = [
         tokenize(
             preprocess_product_name(text, **dataclasses.asdict(preprocessing_config)),
