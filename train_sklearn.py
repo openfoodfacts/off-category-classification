@@ -16,10 +16,12 @@ from utils.preprocess import preprocess_product_name
 from tf.data_utils import process_ingredients
 
 
-def process_df(df: pd.DataFrame,
-               category_to_id: Dict,
-               ingredient_to_id: Dict,
-               vectorizer: CountVectorizer):
+def process_df(
+    df: pd.DataFrame,
+    category_to_id: Dict,
+    ingredient_to_id: Dict,
+    vectorizer: CountVectorizer,
+):
     y = generate_y(df.categories_tags, category_to_id)
     X = generate_X(df, ingredient_to_id, vectorizer)
     return X, y
@@ -44,11 +46,12 @@ train_df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_FR_TRAIN_PATH)).head(1
 test_df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_FR_TEST_PATH)).head(100)
 val_df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_FR_VAL_PATH)).head(100)
 
-count_vectorizer = CountVectorizer(min_df=5,
-                                   preprocessor=preprocess_product_name)
+count_vectorizer = CountVectorizer(min_df=5, preprocessor=preprocess_product_name)
 count_vectorizer.fit(train_df.product_name)
 
-X_train, y_train = process_df(train_df, CATEGORY_TO_ID, INGREDIENT_TO_ID, count_vectorizer)
+X_train, y_train = process_df(
+    train_df, CATEGORY_TO_ID, INGREDIENT_TO_ID, count_vectorizer
+)
 X_test, y_test = process_df(test_df, CATEGORY_TO_ID, INGREDIENT_TO_ID, count_vectorizer)
 X_val, y_val = process_df(val_df, CATEGORY_TO_ID, INGREDIENT_TO_ID, count_vectorizer)
 
@@ -59,5 +62,9 @@ y_pred = clf.predict(X_val)
 print(classification_report(y_val, y_pred, target_names=CATEGORY_NAMES))
 accuracy = accuracy_score(y_val, y_pred)
 
-print(classification_report(y_val, y_pred, target_names=CATEGORY_NAMES, labels=[CATEGORY_TO_ID['en:snacks']]))
+print(
+    classification_report(
+        y_val, y_pred, target_names=CATEGORY_NAMES, labels=[CATEGORY_TO_ID["en:snacks"]]
+    )
+)
 

@@ -1,7 +1,7 @@
 import contextlib
 import dataclasses
 import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import tensorflow as tf
 from tensorflow import keras
@@ -14,8 +14,8 @@ class TrainConfig:
     epochs: int
     lr: float
     label_smoothing: float = 0
-    start_datetime: Optional[datetime.datetime] = None
-    end_datetime: Optional[datetime.datetime] = None
+    start_datetime: Union[datetime.datetime, None, str] = None
+    end_datetime: Union[datetime.datetime, None, str] = None
 
 
 @dataclasses.dataclass
@@ -52,11 +52,13 @@ class Config:
 
 
 def build_model(config: ModelConfig) -> keras.Model:
-    ingredient_input = layers.Input(shape=(config.ingredient_voc_size, ))
-    product_name_input = layers.Input(shape=(config.product_name_max_length, ))
-    product_name_embedding = layers.Embedding(input_dim=config.product_name_voc_size+1,
-                                              output_dim=config.product_name_embedding_size,
-                                              mask_zero=False)(product_name_input)
+    ingredient_input = layers.Input(shape=(config.ingredient_voc_size))
+    product_name_input = layers.Input(shape=(config.product_name_max_length))
+    product_name_embedding = layers.Embedding(
+        input_dim=config.product_name_voc_size + 1,
+        output_dim=config.product_name_embedding_size,
+        mask_zero=False,
+    )(product_name_input)
     product_name_lstm = layers.Bidirectional(
         layers.LSTM(
             units=config.product_name_lstm_units,
@@ -69,8 +71,8 @@ def build_model(config: ModelConfig) -> keras.Model:
     concat = layers.Dropout(config.hidden_dropout)(concat)
     hidden = layers.Dense(config.hidden_dim)(concat)
     hidden = layers.Dropout(config.hidden_dropout)(hidden)
-    hidden = layers.Activation('relu')(hidden)
-    output = layers.Dense(config.output_dim, activation='sigmoid')(hidden)
+    hidden = layers.Activation("relu")(hidden)
+    output = layers.Dense(config.output_dim, activation="sigmoid")(hidden)
     return keras.Model(inputs=[ingredient_input, product_name_input], outputs=[output])
 
 

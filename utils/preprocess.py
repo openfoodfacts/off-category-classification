@@ -57,11 +57,9 @@ def get_ingredients(df: pd.DataFrame) -> Set[str]:
     return ingredients_all
 
 
-def preprocess_product_name(text: str,
-                            lower: bool,
-                            strip_accent: bool,
-                            remove_punct: bool,
-                            remove_digit: bool) -> str:
+def preprocess_product_name(
+    text: str, lower: bool, strip_accent: bool, remove_punct: bool, remove_digit: bool
+) -> str:
     if strip_accent:
         text = strip_accents_ascii(text)
 
@@ -69,12 +67,12 @@ def preprocess_product_name(text: str,
         text = text.lower()
 
     if remove_punct:
-        text = PUNCTUATION_REGEX.sub(' ', text)
+        text = PUNCTUATION_REGEX.sub(" ", text)
 
     if remove_digit:
-        text = DIGIT_REGEX.sub(' ', text)
+        text = DIGIT_REGEX.sub(" ", text)
 
-    return MULTIPLE_SPACES_REGEX.sub(' ', text)
+    return MULTIPLE_SPACES_REGEX.sub(" ", text)
 
 
 def tokenize_batch(texts: Iterable[str], nlp) -> Iterable[Iterable[str]]:
@@ -83,11 +81,11 @@ def tokenize_batch(texts: Iterable[str], nlp) -> Iterable[Iterable[str]]:
 
 
 def get_nlp(lang: str):
-    lang = 'en' if lang == 'xx' else lang
+    lang = "en" if lang == "xx" else lang
 
-    if lang == 'fr':
+    if lang == "fr":
         return French()
-    elif lang == 'en':
+    elif lang == "en":
         return English()
     else:
         raise ValueError("unknown lang: {}".format(lang))
@@ -97,8 +95,9 @@ def tokenize(text: str, nlp):
     return [token.orth_ for token in nlp(text)]
 
 
-def extract_vocabulary(tokens: Iterable[Iterable[str]],
-                       min_count: int = 0) -> Dict[str, int]:
+def extract_vocabulary(
+    tokens: Iterable[Iterable[str]], min_count: int = 0
+) -> Dict[str, int]:
     vocabulary = defaultdict(int)
 
     for doc_tokens in tokens:
@@ -118,9 +117,9 @@ def extract_vocabulary(tokens: Iterable[Iterable[str]],
         UNK_TOKEN: 1,
     }
     offset = 2
-    for token, _ in sorted(vocabulary.items(),
-                           key=operator.itemgetter(1),
-                           reverse=True):
+    for token, _ in sorted(
+        vocabulary.items(), key=operator.itemgetter(1), reverse=True
+    ):
         token_to_int[token] = offset
         offset += 1
 
@@ -130,8 +129,8 @@ def extract_vocabulary(tokens: Iterable[Iterable[str]],
 def generate_y(categories_tags: Iterable[Iterable[str]], category_to_id: Dict):
     category_count = len(category_to_id)
     cat_binarizer = MultiLabelBinarizer(classes=list(range(category_count)))
-    category_int = [[category_to_id[cat]
-                     for cat in product_categories
-                     if cat in category_to_id]
-                    for product_categories in categories_tags]
+    category_int = [
+        [category_to_id[cat] for cat in product_categories if cat in category_to_id]
+        for product_categories in categories_tags
+    ]
     return cat_binarizer.fit_transform(category_int)

@@ -5,15 +5,15 @@ import numpy as np
 from tensorflow.keras.callbacks import Callback
 
 
-def update_averages(ema_list: List[np.ndarray],
-                    weights_list: List[np.ndarray],
-                    t: int, max_decay=0.9999):
+def update_averages(
+    ema_list: List[np.ndarray], weights_list: List[np.ndarray], t: int, max_decay=0.9999
+):
     decay = (1.0 + t) / (10.0 + t)
     if decay > max_decay:
         decay = max_decay
 
     for weight, ema in zip(weights_list, ema_list):
-        ema -= (1-decay) * (ema - weight)
+        ema -= (1 - decay) * (ema - weight)
 
 
 class MovingWeightAveraging(Callback):
@@ -27,9 +27,7 @@ class MovingWeightAveraging(Callback):
             self.averages = self.model.get_weights()
 
     def on_train_batch_end(self, batch, logs=None):
-        update_averages(self.averages,
-                        self.model.get_weights(),
-                        batch)
+        update_averages(self.averages, self.model.get_weights(), batch)
 
     def on_test_begin(self, logs=None):
         self.train_weights = self.model.get_weights()

@@ -18,29 +18,51 @@ import settings
 from category_classification.data_utils import generate_data_from_df, create_dataframe
 from category_classification.models import build_model, Config, SingleNodeStrategy
 from utils import update_dict_dot
-from utils.io import save_product_name_vocabulary, save_config, save_category_vocabulary, save_ingredient_vocabulary, \
-    save_json, copy_category_taxonomy
+from utils.io import (
+    save_product_name_vocabulary,
+    save_config,
+    save_category_vocabulary,
+    save_ingredient_vocabulary,
+    save_json,
+    copy_category_taxonomy,
+)
 from utils.metrics import evaluation_report
-from utils.preprocess import count_categories, count_ingredients, get_nlp, tokenize_batch, extract_vocabulary, \
-    preprocess_product_name
+from utils.preprocess import (
+    count_categories,
+    count_ingredients,
+    get_nlp,
+    tokenize_batch,
+    extract_vocabulary,
+    preprocess_product_name,
+)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('config', type=pathlib.Path)
-    parser.add_argument('output_dir', type=pathlib.Path)
-    parser.add_argument('--extra-params', help="extra parameters updating the base configuration")
-    parser.add_argument('--tpu', action="store_true", default=False, help="activate TPU training on Google Colab")
-    parser.add_argument('--repeat', type=int, default=1, help="number of replicates to run")
-    parser.add_argument('--lang', type=str, default='fr')
+    parser.add_argument("config", type=pathlib.Path)
+    parser.add_argument("output_dir", type=pathlib.Path)
+    parser.add_argument(
+        "--extra-params", help="extra parameters updating the base configuration"
+    )
+    parser.add_argument(
+        "--tpu",
+        action="store_true",
+        default=False,
+        help="activate TPU training on Google Colab",
+    )
+    parser.add_argument(
+        "--repeat", type=int, default=1, help="number of replicates to run"
+    )
+    parser.add_argument("--lang", type=str, default="fr")
     return parser.parse_args()
 
 
 def create_model(tpu: bool, config: Config) -> keras.Model:
     if tpu:
-        tpu_address = 'grpc://' + os.environ['COLAB_TPU_ADDR']
+        tpu_address = "grpc://" + os.environ["COLAB_TPU_ADDR"]
         cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
-            tpu=tpu_address)
+            tpu=tpu_address
+        )
         tf.config.experimental_connect_to_cluster(cluster_resolver)
         tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
         strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
@@ -49,20 +71,24 @@ def create_model(tpu: bool, config: Config) -> keras.Model:
 
     with strategy.scope():
         model = build_model(config.model_config)
-        loss_fn = keras.losses.BinaryCrossentropy(label_smoothing=config.train_config.label_smoothing)
+        loss_fn = keras.losses.BinaryCrossentropy(
+            label_smoothing=config.train_config.label_smoothing
+        )
         optimizer = keras.optimizers.Adam(learning_rate=config.train_config.lr)
-        model.compile(optimizer=optimizer,
-                      loss=loss_fn,
-                      metrics=['binary_accuracy', 'Precision', 'Recall'])
+        model.compile(
+            optimizer=optimizer,
+            loss=loss_fn,
+            metrics=["binary_accuracy", "Precision", "Recall"],
+        )
 
     return model
 
 
 def get_config(args) -> Config:
-    with args.config.open('r') as f:
+    with args.config.open("r") as f:
         config_dict = json.load(f)
 
-    config_dict['lang'] = args.lang
+    config_dict["lang"] = args.lang
 
     if args.tpu:
         print("TPU training enabled")
@@ -75,12 +101,16 @@ def get_config(args) -> Config:
     return dacite.from_dict(Config, config_dict)
 
 
-def train(train_data, val_data, test_data,
-          model: keras.Model,
-          save_dir: pathlib.Path,
-          config: Config,
-          category_taxonomy: Taxonomy,
-          category_names: List[str]):
+def train(
+    train_data,
+    val_data,
+    test_data,
+    model: keras.Model,
+    save_dir: pathlib.Path,
+    config: Config,
+    category_taxonomy: Taxonomy,
+    category_names: List[str],
+):
     print("Starting training...")
     temporary_log_dir = pathlib.Path(tempfile.mkdtemp())
     print("Temporary log directory: {}".format(temporary_log_dir))
@@ -89,56 +119,53 @@ def train(train_data, val_data, test_data,
     X_val, y_val = val_data
     X_test, y_test = test_data
 
-    model.fit(X_train, y_train,
-              batch_size=config.train_config.batch_size,
-              epochs=config.train_config.epochs,
-              validation_data=(X_val, y_val),
-              callbacks=[
-                  callbacks.TerminateOnNaN(),
-                  callbacks.ModelCheckpoint(
-                      filepath=str(save_dir / "weights.{epoch:02d}-{val_loss:.4f}.hdf5"),
-                      monitor='val_loss',
-                      save_best_only=True,
-                  ),
-                  callbacks.TensorBoard(
-                      log_dir=str(temporary_log_dir),
-                      histogram_freq=2,
-                  ),
-                  callbacks.EarlyStopping(
-                      monitor='val_loss',
-                      patience=4,
-                  ),
-                  callbacks.CSVLogger(str(save_dir / "training.csv")),
-              ])
+    model.fit(
+        X_train,
+        y_train,
+        batch_size=config.train_config.batch_size,
+        epochs=config.train_config.epochs,
+        validation_data=(X_val, y_val),
+        callbacks=[
+            callbacks.TerminateOnNaN(),
+            callbacks.ModelCheckpoint(
+                filepath=str(save_dir / "weights.{epoch:02d}-{val_loss:.4f}.hdf5"),
+                monitor="val_loss",
+                save_best_only=True,
+            ),
+            callbacks.TensorBoard(log_dir=str(temporary_log_dir), histogram_freq=2),
+            callbacks.EarlyStopping(monitor="val_loss", patience=4),
+            callbacks.CSVLogger(str(save_dir / "training.csv")),
+        ],
+    )
     print("Training ended")
 
-    log_dir = save_dir / 'logs'
+    log_dir = save_dir / "logs"
     print("Moving log directory from {} to {}".format(temporary_log_dir, log_dir))
     shutil.move(str(temporary_log_dir), str(log_dir))
 
-    model.save(str(save_dir / 'last_checkpoint.hdf5'))
+    model.save(str(save_dir / "last_checkpoint.hdf5"))
 
-    last_checkpoint_path = sorted(save_dir.glob('weights.*.hdf5'))[-1]
+    last_checkpoint_path = sorted(save_dir.glob("weights.*.hdf5"))[-1]
 
     print("Restoring last checkpoint {}".format(last_checkpoint_path))
     model = keras.models.load_model(str(last_checkpoint_path))
 
     print("Evaluating on validation dataset")
     y_pred_val = model.predict(X_val)
-    report, clf_report = evaluation_report(y_val, y_pred_val,
-                                           taxonomy=category_taxonomy,
-                                           category_names=category_names)
+    report, clf_report = evaluation_report(
+        y_val, y_pred_val, taxonomy=category_taxonomy, category_names=category_names
+    )
 
-    save_json(report, save_dir / 'metrics_val.json')
-    save_json(clf_report, save_dir / 'classification_report_val.json')
+    save_json(report, save_dir / "metrics_val.json")
+    save_json(clf_report, save_dir / "classification_report_val.json")
 
     y_pred_test = model.predict(X_test)
-    report, clf_report = evaluation_report(y_test, y_pred_test,
-                                           taxonomy=category_taxonomy,
-                                           category_names=category_names)
+    report, clf_report = evaluation_report(
+        y_test, y_pred_test, taxonomy=category_taxonomy, category_names=category_names
+    )
 
-    save_json(report, save_dir / 'metrics_test.json')
-    save_json(clf_report, save_dir / 'classification_report_test.json')
+    save_json(report, save_dir / "metrics_test.json")
+    save_json(clf_report, save_dir / "classification_report_test.json")
 
 
 def main():
@@ -152,43 +179,58 @@ def main():
     category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
     ingredient_taxonomy = Taxonomy.from_json(settings.INGREDIENTS_TAXONOMY_PATH)
 
-    train_df = create_dataframe('train', args.lang)
-    test_df = create_dataframe('test', args.lang)
-    val_df = create_dataframe('val', args.lang)
+    train_df = create_dataframe("train", args.lang)
+    test_df = create_dataframe("test", args.lang)
+    val_df = create_dataframe("val", args.lang)
 
     categories_count = count_categories(train_df)
     ingredients_count = count_ingredients(train_df)
 
-    selected_categories = set((cat
-                               for cat, count in categories_count.items()
-                               if count >= config.category_min_count))
-    selected_ingredients = set((ingredient
-                                for ingredient, count in ingredients_count.items()
-                                if count >= config.ingredient_min_count))
+    selected_categories = set(
+        (
+            cat
+            for cat, count in categories_count.items()
+            if count >= config.category_min_count
+        )
+    )
+    selected_ingredients = set(
+        (
+            ingredient
+            for ingredient, count in ingredients_count.items()
+            if count >= config.ingredient_min_count
+        )
+    )
     print("{} categories selected".format(len(selected_categories)))
     print("{} ingredients selected".format(len(selected_ingredients)))
 
-    category_names = [x for x in sorted(category_taxonomy.keys())
-                      if x in selected_categories]
+    category_names = [
+        x for x in sorted(category_taxonomy.keys()) if x in selected_categories
+    ]
 
-    ingredient_names = [x for x in sorted(ingredient_taxonomy.keys())
-                        if x in selected_ingredients]
+    ingredient_names = [
+        x for x in sorted(ingredient_taxonomy.keys()) if x in selected_ingredients
+    ]
 
     category_to_id = {name: idx for idx, name in enumerate(category_names)}
     ingredient_to_id = {name: idx for idx, name in enumerate(ingredient_names)}
 
     nlp = get_nlp(lang=config.lang)
 
-    preprocess_product_name_func = functools.partial(preprocess_product_name,
-                                                     lower=config.product_name_preprocessing_config.lower,
-                                                     strip_accent=config.product_name_preprocessing_config.strip_accent,
-                                                     remove_punct=config.product_name_preprocessing_config.remove_punct,
-                                                     remove_digit=config.product_name_preprocessing_config.remove_digit)
-    preprocessed_product_names_iter = (preprocess_product_name_func(product_name)
-                                       for product_name in train_df.product_name)
+    preprocess_product_name_func = functools.partial(
+        preprocess_product_name,
+        lower=config.product_name_preprocessing_config.lower,
+        strip_accent=config.product_name_preprocessing_config.strip_accent,
+        remove_punct=config.product_name_preprocessing_config.remove_punct,
+        remove_digit=config.product_name_preprocessing_config.remove_digit,
+    )
+    preprocessed_product_names_iter = (
+        preprocess_product_name_func(product_name)
+        for product_name in train_df.product_name
+    )
     train_tokens_iter = tokenize_batch(preprocessed_product_names_iter, nlp)
-    product_name_to_int = extract_vocabulary(train_tokens_iter,
-                                             config.product_name_min_count)
+    product_name_to_int = extract_vocabulary(
+        train_tokens_iter, config.product_name_min_count
+    )
 
     model_config.ingredient_voc_size = len(ingredient_to_id)
     model_config.output_dim = len(category_to_id)
@@ -196,13 +238,15 @@ def main():
 
     print("Selected vocabulary: {}".format(len(product_name_to_int)))
 
-    generate_data_partial = functools.partial(generate_data_from_df,
-                                              ingredient_to_id=ingredient_to_id,
-                                              category_to_id=category_to_id,
-                                              product_name_max_length=model_config.product_name_max_length,
-                                              product_name_token_to_int=product_name_to_int,
-                                              nlp=nlp,
-                                              product_name_preprocessing_config=config.product_name_preprocessing_config)
+    generate_data_partial = functools.partial(
+        generate_data_from_df,
+        ingredient_to_id=ingredient_to_id,
+        category_to_id=category_to_id,
+        product_name_max_length=model_config.product_name_max_length,
+        product_name_token_to_int=product_name_to_int,
+        nlp=nlp,
+        product_name_preprocessing_config=config.product_name_preprocessing_config,
+    )
 
     replicates = args.repeat
     if replicates == 1:
@@ -215,8 +259,7 @@ def main():
         save_dir.mkdir(exist_ok=True)
         config.train_config.start_datetime = str(datetime.datetime.utcnow())
         print("Starting training repeat {}".format(i))
-        save_product_name_vocabulary(product_name_to_int,
-                                     save_dir)
+        save_product_name_vocabulary(product_name_to_int, save_dir)
         save_config(config, save_dir)
         copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
         save_category_vocabulary(category_to_id, save_dir)
@@ -226,10 +269,16 @@ def main():
         X_val, y_val = generate_data_partial(val_df)
         X_test, y_test = generate_data_partial(test_df)
 
-        train((X_train, y_train),
-              (X_val, y_val),
-              (X_test, y_test),
-              model, save_dir, config, category_taxonomy, category_names)
+        train(
+            (X_train, y_train),
+            (X_val, y_val),
+            (X_test, y_test),
+            model,
+            save_dir,
+            config,
+            category_taxonomy,
+            category_names,
+        )
 
         config.train_config.end_datetime = str(datetime.datetime.utcnow())
         save_config(config, save_dir)
