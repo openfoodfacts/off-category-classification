@@ -13,6 +13,22 @@ from utils.constant import UNK_TOKEN
 from utils.preprocess import generate_y, preprocess_product_name, tokenize
 
 
+NUTRIMENTS = [
+    "energy-kcal_100g",
+    "proteins_100g",
+    "carbohydrates_100g",
+    "sugars_100g",
+    "fat_100g",
+    "saturated-fat_100g",
+    "fiber_100g",
+    "sodium_100g",
+    "alcohol_100g",
+    "fruits-vegetables-nuts_100g",
+]
+
+NUTRIMENT_TO_IDX = {nutrient: idx for idx, nutrient in enumerate(NUTRIMENTS)}
+
+
 def create_dataframe(split: str, lang: str) -> pd.DataFrame:
     if split not in ("train", "test", "val"):
         raise ValueError("split must be either 'train', 'test' or 'val'")
@@ -100,3 +116,14 @@ def process_product_name(
         for tokens in tokens_all
     ]
     return pad_sequences(tokens_int, max_length)
+
+
+def process_nutriments(nutriments_iter: Iterable[Dict]) -> np.ndarray:
+    nutriments_list = list(nutriments_iter)
+
+    array = np.zeros((len(nutriments_list), len(NUTRIMENTS)), type=np.float32)
+
+    for i, product_nutriments in enumerate(nutriments_list):
+        for nutriment in NUTRIMENTS:
+            if nutriment in product_nutriments:
+                array[i, NUTRIMENT_TO_IDX[nutriment]] = product_nutriments[nutriment]

@@ -13,7 +13,7 @@ from tensorflow import keras
 from tensorflow.keras import callbacks
 
 from category_classification.data_utils import create_dataframe, generate_data_from_df
-from category_classification.models import build_model, Config, SingleNodeStrategy
+from category_classification.models import build_model, Config
 import settings
 from utils import update_dict_dot
 from utils.io import (
@@ -50,20 +50,16 @@ def parse_args():
 
 
 def create_model(config: Config) -> keras.Model:
-    strategy = SingleNodeStrategy()
-
-    with strategy.scope():
-        model = build_model(config.model_config)
-        loss_fn = keras.losses.BinaryCrossentropy(
-            label_smoothing=config.train_config.label_smoothing
-        )
-        optimizer = keras.optimizers.Adam(learning_rate=config.train_config.lr)
-        model.compile(
-            optimizer=optimizer,
-            loss=loss_fn,
-            metrics=["binary_accuracy", "Precision", "Recall"],
-        )
-
+    model = build_model(config.model_config)
+    loss_fn = keras.losses.BinaryCrossentropy(
+        label_smoothing=config.train_config.label_smoothing
+    )
+    optimizer = keras.optimizers.Adam(learning_rate=config.train_config.lr)
+    model.compile(
+        optimizer=optimizer,
+        loss=loss_fn,
+        metrics=["binary_accuracy", "Precision", "Recall"],
+    )
     return model
 
 
@@ -72,9 +68,6 @@ def get_config(args) -> Config:
         config_dict = json.load(f)
 
     config_dict["lang"] = args.lang
-
-    if args.tpu:
-        print("TPU training enabled")
 
     if args.extra_params:
         print("Extra parameters: {}".format(args.extra_params))

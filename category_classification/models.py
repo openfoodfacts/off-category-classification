@@ -84,9 +84,3 @@ def use_params(model: keras.Model, weights: List):
         yield
     finally:
         model.set_weights(old_weights)
-
-
-class SingleNodeStrategy:
-    @contextlib.contextmanager
-    def scope(self):
-        yield
