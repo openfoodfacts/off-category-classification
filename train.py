@@ -2,7 +2,6 @@ import argparse
 import datetime
 import functools
 import json
-import os
 import pathlib
 import shutil
 import tempfile
@@ -10,30 +9,29 @@ from typing import List
 
 import dacite
 from robotoff.taxonomy import Taxonomy
-import tensorflow as tf
-from tensorflow.keras import callbacks
 from tensorflow import keras
+from tensorflow.keras import callbacks
 
-import settings
-from category_classification.data_utils import generate_data_from_df, create_dataframe
+from category_classification.data_utils import create_dataframe, generate_data_from_df
 from category_classification.models import build_model, Config, SingleNodeStrategy
+import settings
 from utils import update_dict_dot
 from utils.io import (
-    save_product_name_vocabulary,
-    save_config,
+    copy_category_taxonomy,
     save_category_vocabulary,
+    save_config,
     save_ingredient_vocabulary,
     save_json,
-    copy_category_taxonomy,
+    save_product_name_vocabulary,
 )
 from utils.metrics import evaluation_report
 from utils.preprocess import (
     count_categories,
     count_ingredients,
-    get_nlp,
-    tokenize_batch,
     extract_vocabulary,
+    get_nlp,
     preprocess_product_name,
+    tokenize_batch,
 )
 
 
@@ -45,29 +43,14 @@ def parse_args():
         "--extra-params", help="extra parameters updating the base configuration"
     )
     parser.add_argument(
-        "--tpu",
-        action="store_true",
-        default=False,
-        help="activate TPU training on Google Colab",
-    )
-    parser.add_argument(
         "--repeat", type=int, default=1, help="number of replicates to run"
     )
     parser.add_argument("--lang", type=str, default="fr")
     return parser.parse_args()
 
 
-def create_model(tpu: bool, config: Config) -> keras.Model:
-    if tpu:
-        tpu_address = "grpc://" + os.environ["COLAB_TPU_ADDR"]
-        cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
-            tpu=tpu_address
-        )
-        tf.config.experimental_connect_to_cluster(cluster_resolver)
-        tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
-        strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
-    else:
-        strategy = SingleNodeStrategy()
+def create_model(config: Config) -> keras.Model:
+    strategy = SingleNodeStrategy()
 
     with strategy.scope():
         model = build_model(config.model_config)
@@ -255,7 +238,7 @@ def main():
         save_dirs = [output_dir / str(i) for i in range(replicates)]
 
     for i, save_dir in enumerate(save_dirs):
-        model = create_model(args.tpu, config)
+        model = create_model(config)
         save_dir.mkdir(exist_ok=True)
         config.train_config.start_datetime = str(datetime.datetime.utcnow())
         print("Starting training repeat {}".format(i))
