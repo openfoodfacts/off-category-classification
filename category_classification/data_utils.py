@@ -11,22 +11,7 @@ from category_classification.models import TextPreprocessingConfig
 import settings
 from utils.constant import UNK_TOKEN
 from utils.preprocess import generate_y, preprocess_product_name, tokenize
-
-
-NUTRIMENTS = [
-    "energy-kcal_100g",
-    "proteins_100g",
-    "carbohydrates_100g",
-    "sugars_100g",
-    "fat_100g",
-    "saturated-fat_100g",
-    "fiber_100g",
-    "sodium_100g",
-    "alcohol_100g",
-    "fruits-vegetables-nuts_100g",
-]
-
-NUTRIMENT_TO_IDX = {nutrient: idx for idx, nutrient in enumerate(NUTRIMENTS)}
+from .constants import NUTRIMENTS, NUTRIMENTS_TO_IDX
 
 
 def create_dataframe(split: str, lang: str) -> pd.DataFrame:
@@ -162,6 +147,6 @@ def process_nutriments(nutriments_iter: Iterable[Optional[Dict]]) -> np.ndarray:
     for i, product_nutriments in enumerate(nutriments_list):
         if product_nutriments is not None:
             for nutriment in NUTRIMENTS:
-                array[i, NUTRIMENT_TO_IDX[nutriment]] = get_nutriment_value(
+                array[i, NUTRIMENTS_TO_IDX[nutriment]] = get_nutriment_value(
                     product_nutriments, nutriment
                 )

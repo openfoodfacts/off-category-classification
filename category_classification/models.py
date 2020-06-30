@@ -7,7 +7,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
-from .data_utils import NUTRIMENTS
+from .constants import NUTRIMENTS
 
 
 @dataclasses.dataclass
