@@ -63,6 +63,7 @@ X, y = generate_data_from_df(
     nlp=nlp,
     product_name_max_length=config.model_config.product_name_max_length,
     product_name_preprocessing_config=config.product_name_preprocessing_config,
+    nutriments_input=config.model_config.nutriment_input,
 )
 
 

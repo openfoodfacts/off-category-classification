@@ -55,12 +55,8 @@ while True:
         print("Product {} not found".format(barcode))
         continue
 
-    ingredient_tags = product.get("ingredients_tags", []) or []
-    product_name = product.get("product_name", "") or ""
-
     X = generate_data(
-        ingredient_tags=ingredient_tags,
-        product_name=product_name,
+        product=product,
         ingredient_to_id=ingredient_to_id,
         product_name_token_to_int=product_name_vocabulary,
         nlp=nlp,

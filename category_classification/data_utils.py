@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Dict, Iterable
+from typing import Any, Dict, Iterable, Optional
 
 import numpy as np
 import pandas as pd
@@ -46,6 +46,7 @@ def generate_data_from_df(
     nlp,
     product_name_max_length: int,
     product_name_preprocessing_config: TextPreprocessingConfig,
+    nutriment_input: bool,
 ):
     ingredient_matrix = process_ingredients(
         df.known_ingredient_tags, ingredient_to_id
@@ -57,19 +58,29 @@ def generate_data_from_df(
         max_length=product_name_max_length,
         preprocessing_config=product_name_preprocessing_config,
     )
+
+    inputs = [ingredient_matrix, product_name_matrix]
+
+    if nutriment_input:
+        nutriments_matrix = process_nutriments(df.nutriments)
+        inputs.append(nutriments_matrix)
+
     y = generate_y(df.categories_tags, category_to_id)
-    return [ingredient_matrix, product_name_matrix], y
+    return inputs, y
 
 
 def generate_data(
-    ingredient_tags: Iterable[str],
-    product_name: str,
+    product: Dict[str, Any],
     ingredient_to_id: Dict,
     product_name_token_to_int: Dict[str, int],
     nlp,
     product_name_max_length: int,
     product_name_preprocessing_config: TextPreprocessingConfig,
+    nutriment_input: bool,
 ):
+    ingredient_tags = product.get("ingredients_tags", []) or []
+    product_name = product.get("product_name", "") or ""
+    nutriments = product.get("nutriments") or None
     ingredient_matrix = process_ingredients([list(ingredient_tags)], ingredient_to_id)
     product_name_matrix = process_product_name(
         [product_name],
@@ -78,7 +89,13 @@ def generate_data(
         max_length=product_name_max_length,
         preprocessing_config=product_name_preprocessing_config,
     )
-    return [ingredient_matrix, product_name_matrix]
+
+    inputs = [ingredient_matrix, product_name_matrix]
+    if nutriment_input:
+        nutriments_matrix = process_nutriments([nutriments])
+        inputs.append(nutriments_matrix)
+
+    return inputs
 
 
 def process_ingredients(
@@ -118,12 +135,33 @@ def process_product_name(
     return pad_sequences(tokens_int, max_length)
 
 
-def process_nutriments(nutriments_iter: Iterable[Dict]) -> np.ndarray:
+def get_nutriment_value(nutriments: Dict[str, Any], nutriment_name: str) -> float:
+    if nutriment_name in nutriments:
+        value = nutriments[nutriment_name]
+
+        if isinstance(value, str):
+            try:
+                value = float(value)
+            except ValueError:
+                return 0.0
+
+        if isinstance(value, float):
+            if value == float("nan"):
+                return 0.0
+
+            return value
+
+    return 0.0
+
+
+def process_nutriments(nutriments_iter: Iterable[Optional[Dict]]) -> np.ndarray:
     nutriments_list = list(nutriments_iter)
 
     array = np.zeros((len(nutriments_list), len(NUTRIMENTS)), type=np.float32)
 
     for i, product_nutriments in enumerate(nutriments_list):
-        for nutriment in NUTRIMENTS:
-            if nutriment in product_nutriments:
-                array[i, NUTRIMENT_TO_IDX[nutriment]] = product_nutriments[nutriment]
+        if product_nutriments is not None:
+            for nutriment in NUTRIMENTS:
+                array[i, NUTRIMENT_TO_IDX[nutriment]] = get_nutriment_value(
+                    product_nutriments, nutriment
+                )

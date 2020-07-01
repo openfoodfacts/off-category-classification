@@ -7,6 +7,8 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
+from .data_utils import NUTRIMENTS
+
 
 @dataclasses.dataclass
 class TrainConfig:
@@ -38,6 +40,7 @@ class ModelConfig:
     output_dim: Optional[int] = None
     product_name_voc_size: Optional[int] = None
     ingredient_voc_size: Optional[int] = None
+    nutriment_input: bool = False
 
 
 @dataclasses.dataclass
@@ -67,13 +70,21 @@ def build_model(config: ModelConfig) -> keras.Model:
         )
     )(product_name_embedding)
     ingredient_input = tf.cast(ingredient_input, tf.float32)
-    concat = layers.Concatenate()([ingredient_input, product_name_lstm])
+    inputs = [ingredient_input, product_name_input]
+    concat_input = [ingredient_input, product_name_lstm]
+
+    if config.nutriment_input:
+        nutriment_input = layers.Input(shape=len(NUTRIMENTS))
+        inputs.append(nutriment_input)
+        concat_input.append(nutriment_input)
+
+    concat = layers.Concatenate()(concat_input)
     concat = layers.Dropout(config.hidden_dropout)(concat)
     hidden = layers.Dense(config.hidden_dim)(concat)
     hidden = layers.Dropout(config.hidden_dropout)(hidden)
     hidden = layers.Activation("relu")(hidden)
     output = layers.Dense(config.output_dim, activation="sigmoid")(hidden)
-    return keras.Model(inputs=[ingredient_input, product_name_input], outputs=[output])
+    return keras.Model(inputs=inputs, outputs=[output])
 
 
 @contextlib.contextmanager

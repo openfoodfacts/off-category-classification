@@ -54,6 +54,7 @@ generate_data_partial = functools.partial(
     product_name_token_to_int=product_name_vocabulary,
     nlp=nlp,
     product_name_preprocessing_config=config.product_name_preprocessing_config,
+    nutriment_input=config.model_config.nutriment_input,
 )
 
 val_df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_FR_VAL_PATH))
