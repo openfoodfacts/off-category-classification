@@ -30,7 +30,7 @@ def iter_product(data_path: pathlib.Path):
 
         if "nutriments" in product:
             nutriments = product["nutriments"] or {}
-            for key in nutriments:
+            for key in list(nutriments.keys()):
                 if key not in NUTRIMENTS:
                     nutriments.pop(key)
 
