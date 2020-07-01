@@ -1,4 +1,5 @@
 import dataclasses
+import pathlib
 from typing import Any, Dict, Iterable, Optional
 
 import numpy as np
@@ -20,7 +21,20 @@ def create_dataframe(split: str, lang: str) -> pd.DataFrame:
 
     file_name = "category_{}.{}.jsonl.gz".format(lang, split)
     full_path = settings.DATA_DIR / file_name
-    return pd.DataFrame(gzip_jsonl_iter(full_path))
+    return pd.DataFrame(iter_product(full_path))
+
+
+def iter_product(data_path: pathlib.Path):
+    for product in gzip_jsonl_iter(data_path):
+        product.pop("images", None)
+
+        if "nutriments" in product:
+            nutriments = product["nutriments"] or {}
+            for key in nutriments:
+                if key not in NUTRIMENTS:
+                    nutriments.pop(key)
+
+        yield product
 
 
 def generate_data_from_df(
