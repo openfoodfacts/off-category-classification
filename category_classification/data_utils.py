@@ -1,6 +1,7 @@
+from collections import defaultdict
 import dataclasses
 import pathlib
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Callable, Dict, Iterable, Optional
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,12 @@ from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 from category_classification.models import TextPreprocessingConfig
 import settings
 from utils.constant import UNK_TOKEN
-from utils.preprocess import generate_y, preprocess_product_name, tokenize
+from utils.preprocess import (
+    extract_vocabulary_from_counter,
+    generate_y,
+    preprocess_product_name,
+    tokenize,
+)
 from .constants import NUTRIMENTS, NUTRIMENTS_TO_IDX
 
 
@@ -35,6 +41,44 @@ def iter_product(data_path: pathlib.Path):
                     nutriments.pop(key)
 
         yield product
+
+
+def analyze_dataset(
+    data_path: pathlib.Path,
+    min_category_count: int,
+    min_ingredient_count: int,
+    product_name_min_count: int,
+    product_name_process_fn: Callable,
+):
+    category_count: Dict[str, int] = defaultdict(int)
+    ingredient_count: Dict[str, int] = defaultdict(int)
+    vocabulary: Dict[str, int] = defaultdict(int)
+
+    for product in iter_product(data_path):
+        product_name = product.get("product_name", "") or ""
+        tokens = product_name_process_fn(product_name)
+
+        for token in tokens:
+            vocabulary[token] += 1
+
+        for category in product["category_tags"]:
+            category_count[category] += 1
+
+        for ingredient_tag in product["ingredients_tags"]:
+            ingredient_count[ingredient_tag] += 1
+
+    category_to_id = filter_min_count(category_count, min_category_count)
+    ingredient_to_id = filter_min_count(ingredient_count, min_ingredient_count)
+    token_to_id = extract_vocabulary_from_counter(vocabulary, product_name_min_count)
+
+    return category_to_id, ingredient_to_id, token_to_id
+
+
+def filter_min_count(counter: Dict[str, int], min_count: int):
+    selected = sorted(
+        set((cat for cat, count in counter.items() if count >= min_count))
+    )
+    return {name: idx for idx, name in enumerate(selected)}
 
 
 def generate_data_from_df(

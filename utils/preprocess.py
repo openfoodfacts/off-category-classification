@@ -98,28 +98,32 @@ def tokenize(text: str, nlp):
 def extract_vocabulary(
     tokens: Iterable[Iterable[str]], min_count: int = 0
 ) -> Dict[str, int]:
-    vocabulary = defaultdict(int)
+    vocabulary: Dict[str, int] = defaultdict(int)
 
     for doc_tokens in tokens:
         for token in doc_tokens:
             vocabulary[token] += 1
 
+    return extract_vocabulary_from_counter(vocabulary)
+
+
+def extract_vocabulary_from_counter(
+    counter: Dict[str, int], min_count: int = 0
+) -> Dict[str, int]:
     to_delete: Set[str] = set()
-    for token, count in vocabulary.items():
+    for token, count in counter.items():
         if count < min_count:
             to_delete.add(token)
 
     for token in to_delete:
-        vocabulary.pop(token)
+        counter.pop(token)
 
     token_to_int: Dict[str, int] = {
         PAD_TOKEN: 0,
         UNK_TOKEN: 1,
     }
     offset = 2
-    for token, _ in sorted(
-        vocabulary.items(), key=operator.itemgetter(1), reverse=True
-    ):
+    for token, _ in sorted(counter.items(), key=operator.itemgetter(1), reverse=True):
         token_to_int[token] = offset
         offset += 1
 
