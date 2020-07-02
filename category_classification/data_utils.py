@@ -64,7 +64,7 @@ def analyze_dataset(
         for category in product["categories_tags"]:
             category_count[category] += 1
 
-        for ingredient_tag in product["ingredients_tags"]:
+        for ingredient_tag in product.get("ingredients_tags", []) or []:
             ingredient_count[ingredient_tag] += 1
 
     category_to_id = filter_min_count(category_count, min_category_count)
