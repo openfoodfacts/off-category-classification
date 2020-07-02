@@ -61,7 +61,7 @@ def analyze_dataset(
         for token in tokens:
             vocabulary[token] += 1
 
-        for category in product["category_tags"]:
+        for category in product["categories_tags"]:
             category_count[category] += 1
 
         for ingredient_tag in product["ingredients_tags"]:
