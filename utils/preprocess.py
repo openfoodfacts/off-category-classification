@@ -37,26 +37,6 @@ def count_ingredients(df: pd.DataFrame) -> Dict:
     return ingredients_count
 
 
-def get_categories(df: pd.DataFrame) -> Set[str]:
-    categories_all = set()
-
-    for categories in df.categories_tags:
-        for category in categories:
-            categories_all.add(category)
-
-    return categories_all
-
-
-def get_ingredients(df: pd.DataFrame) -> Set[str]:
-    ingredients_all = set()
-
-    for ingredients in df.known_ingredient_tags:
-        for ingredient in ingredients:
-            ingredients_all.add(ingredient)
-
-    return ingredients_all
-
-
 def preprocess_product_name(
     text: str, lower: bool, strip_accent: bool, remove_punct: bool, remove_digit: bool
 ) -> str:
