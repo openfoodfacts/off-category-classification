@@ -20,7 +20,7 @@
         "hidden_dim": 64,
         "hidden_dropout": 0.2
     },
-    "lang": "fr",
+    "lang": "xx",
     "product_name_min_count": 0,
     "category_min_count": 10,
     "ingredient_min_count": 3
