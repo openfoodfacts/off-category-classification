@@ -55,8 +55,8 @@ class Config:
 
 
 def build_model(config: ModelConfig) -> keras.Model:
-    ingredient_input = layers.Input(shape=(config.ingredient_voc_size))
-    product_name_input = layers.Input(shape=(config.product_name_max_length))
+    ingredient_input = keras.Input(shape=(config.ingredient_voc_size), dtype=tf.float32)
+    product_name_input = keras.Input(shape=(config.product_name_max_length))
     product_name_embedding = layers.Embedding(
         input_dim=config.product_name_voc_size + 1,
         output_dim=config.product_name_embedding_size,
@@ -69,7 +69,7 @@ def build_model(config: ModelConfig) -> keras.Model:
             dropout=config.product_name_lstm_dropout,
         )
     )(product_name_embedding)
-    ingredient_input = tf.cast(ingredient_input, tf.float32)
+
     inputs = [ingredient_input, product_name_input]
     concat_input = [ingredient_input, product_name_lstm]
 

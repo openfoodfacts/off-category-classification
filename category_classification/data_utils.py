@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from robotoff.utils import gzip_jsonl_iter
 from sklearn.preprocessing import MultiLabelBinarizer
-from tensorflow.python.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 from category_classification.models import TextPreprocessingConfig
 import settings
