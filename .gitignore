@@ -5,3 +5,4 @@ __pycache__
 data
 venv
 weights
+category_classification/error_analysis.html

@@ -9,7 +9,8 @@ WEIGHTS_DIR.mkdir(exist_ok=True)
 
 CATEGORY_FR_TEST_PATH = DATA_DIR / "category_fr.test.jsonl.gz"
 CATEGORY_FR_TRAIN_PATH = DATA_DIR / "category_fr.train.jsonl.gz"
-CATEGORY_FR_VAL_PATH = DATA_DIR / "category_fr.val.jsonl.gz"
+
+CATEGORY_XX_VAL_PATH = DATA_DIR / "category_xx.val.jsonl.gz"
 
 CATEGORY_TAXONOMY_PATH = DATA_DIR / "categories.full.json"
 INGREDIENTS_TAXONOMY_PATH = DATA_DIR / "ingredients.full.json"

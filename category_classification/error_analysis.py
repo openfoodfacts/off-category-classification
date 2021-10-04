@@ -27,7 +27,7 @@ from utils.metrics import evaluation_report
 from utils.preprocess import get_nlp
 
 
-model_path = settings.WEIGHTS_DIR / "xx" / "checkpoint.hdf5"
+model_path = settings.WEIGHTS_DIR / "checkpoint.hdf5"
 model_dir = model_path.parent
 
 config = load_config(model_dir)
