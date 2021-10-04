@@ -3,7 +3,7 @@
 mkdir -p data
 cd data
 
-RELEASE='dataset-category-2020-06-30'
+RELEASE='dataset-category-2021-09-15'
 LANG='xx'
 wget https://github.com/openfoodfacts/openfoodfacts-ai/releases/download/${RELEASE}/ingredients.full.json
 wget https://github.com/openfoodfacts/openfoodfacts-ai/releases/download/${RELEASE}/categories.full.json

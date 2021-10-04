@@ -45,7 +45,7 @@ def parse_args():
     parser.add_argument(
         "--repeat", type=int, default=1, help="number of replicates to run"
     )
-    parser.add_argument("--lang", type=str, default="fr")
+    parser.add_argument("--lang", type=str, default="xx")
     return parser.parse_args()
 
 
@@ -108,7 +108,7 @@ def train(
                 monitor="val_loss",
                 save_best_only=True,
             ),
-            callbacks.TensorBoard(log_dir=str(temporary_log_dir), histogram_freq=2),
+            callbacks.TensorBoard(log_dir=str(temporary_log_dir), histogram_freq=2, profile_batch = '500, 510'),
             callbacks.EarlyStopping(monitor="val_loss", patience=4),
             callbacks.CSVLogger(str(save_dir / "training.csv")),
         ],
