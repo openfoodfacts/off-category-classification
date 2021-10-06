@@ -4,9 +4,6 @@ import pathlib
 PROJECT_DIR = pathlib.Path(__file__).parent
 DATA_DIR = PROJECT_DIR / "data"
 
-WEIGHTS_DIR = PROJECT_DIR / "weights"
-WEIGHTS_DIR.mkdir(exist_ok=True)
-
 CATEGORY_FR_TEST_PATH = DATA_DIR / "category_fr.test.jsonl.gz"
 CATEGORY_FR_TRAIN_PATH = DATA_DIR / "category_fr.train.jsonl.gz"
 

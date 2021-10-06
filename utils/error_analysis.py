@@ -21,6 +21,8 @@ def get_interactive_embedding_plot(embeddings: np.ndarray, df: pd.DataFrame):
     pca = PCA(n_components=2)
     pca_embeddings = pca.fit_transform(embeddings)
     df_copy = df.copy()
+    # Bokeh cannot handle non-scalar/array columns, so we filter these out.
+    df_copy.drop(["nutriments", "images"], axis=1, inplace=True)
     df_copy["pca_x"] = pca_embeddings[:, 0]
     df_copy["pca_y"] = pca_embeddings[:, 1]
     hover = HoverTool(
