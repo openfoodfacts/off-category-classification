@@ -4,7 +4,7 @@ import operator
 import pathlib
 from typing import Dict
 
-from bokeh.plotting import save
+from bokeh.plotting import show
 import pandas as pd
 from robotoff.taxonomy import Taxonomy
 from robotoff.utils import gzip_jsonl_iter
@@ -111,11 +111,10 @@ def main():
     ]
     val_df.to_csv(str(model_dir / "error_analysis.tsv"), sep="\t")
 
-    print("making prediction on analysis model")
     emb_val = analysis_model.predict(X_val)
 
     p = get_interactive_embedding_plot(emb_val, val_df)
-    save(p)
+    show(p)
     #
     # report_val, clf_report_val = evaluation_report(y_val, y_pred_val,
     #                                                taxonomy=category_taxonomy,
