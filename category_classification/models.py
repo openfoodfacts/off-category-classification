@@ -90,7 +90,7 @@ class OutputMapperLayer(layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
-    ingredient_input = keras.Input(shape=(config.ingredient_voc_size), dtype=tf.float32)
+    ingredient_input = keras.Input(shape=(None,), dtype=tf.string, name="ingredient")
     product_name_input = keras.Input(shape=(1,), dtype=tf.string, name="product_name")
 
     # max_tokens is chosen somewhat arbitrarily. TODO(kulizhsy): investigate if it could be better.
@@ -113,8 +113,13 @@ def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
         )
     )(product_name_embedding)
 
+    ingredient_preprocessing = tf.keras.layers.StringLookup(max_tokens=335)
+    ingredient_preprocessing.adapt(train_data.ingredient_tags)
+
+    ingredient_layer = ingredient_preprocessing(ingredient_input)
+
     inputs = [ingredient_input, product_name_input]
-    concat_input = [ingredient_input, product_name_lstm]
+    concat_input = [ingredient_layer, product_name_lstm]
 
     if config.nutriment_input:
         nutriment_input = layers.Input(shape=len(NUTRIMENTS))

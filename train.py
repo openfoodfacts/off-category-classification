@@ -107,7 +107,7 @@ def train(
             callbacks.ModelCheckpoint(
                 filepath=str(save_dir / "weights.{epoch:02d}-{val_loss:.4f}"),
                 monitor="val_loss",
-                save_best_only=False, # used to be true
+                save_best_only=True,
                 save_format='tf',
             ),
             callbacks.TensorBoard(log_dir=str(temporary_log_dir), histogram_freq=0, profile_batch = '500, 510'),
@@ -153,14 +153,12 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
-    ingredient_taxonomy = Taxonomy.from_json(settings.INGREDIENTS_TAXONOMY_PATH)
 
     train_df = create_dataframe("train", args.lang)
     test_df = create_dataframe("test", args.lang)
     val_df = create_dataframe("val", args.lang)
 
     categories_count = count_categories(train_df)
-    ingredients_count = count_ingredients(train_df)
 
     selected_categories = set(
         (
@@ -169,59 +167,23 @@ def main():
             if count >= config.category_min_count
         )
     )
-    selected_ingredients = set(
-        (
-            ingredient
-            for ingredient, count in ingredients_count.items()
-            if count >= config.ingredient_min_count
-        )
-    )
+
     print("{} categories selected".format(len(selected_categories)))
-    print("{} ingredients selected".format(len(selected_ingredients)))
 
     category_names = [
         x for x in sorted(category_taxonomy.keys()) if x in selected_categories
     ]
 
-    ingredient_names = [
-        x for x in sorted(ingredient_taxonomy.keys()) if x in selected_ingredients
-    ]
-
     category_to_id = {name: idx for idx, name in enumerate(category_names)}
-    ingredient_to_id = {name: idx for idx, name in enumerate(ingredient_names)}
 
     nlp = get_nlp(lang=config.lang)
 
-    # preprocess_product_name_func = functools.partial(
-    #     preprocess_product_name,
-    #     lower=config.product_name_preprocessing_config.lower,
-    #     strip_accent=config.product_name_preprocessing_config.strip_accent,
-    #     remove_punct=config.product_name_preprocessing_config.remove_punct,
-    #     remove_digit=config.product_name_preprocessing_config.remove_digit,
-    # )
-    # preprocessed_product_names_iter = (
-    #     preprocess_product_name_func(product_name)
-    #     for product_name in train_df.product_name
-    # )
-    # train_tokens_iter = tokenize_batch(preprocessed_product_names_iter, nlp)
-    # product_name_to_int = extract_vocabulary(
-    #     train_tokens_iter, config.product_name_min_count
-    # )
-
-    model_config.ingredient_voc_size = len(ingredient_to_id)
     model_config.output_dim = len(category_to_id)
-    # model_config.product_name_voc_size = len(product_name_to_int)
-
-    # print("Selected vocabulary: {}".format(len(product_name_to_int)))
 
     generate_data_partial = functools.partial(
         generate_data_from_df,
-        ingredient_to_id=ingredient_to_id,
         category_to_id=category_to_id,
-        # product_name_max_length=model_config.product_name_max_length,
-        # product_name_token_to_int=product_name_to_int,
         nlp=nlp,
-        # product_name_preprocessing_config=config.product_name_preprocessing_config,
         nutriment_input=config.model_config.nutriment_input,
     )
 
@@ -236,11 +198,10 @@ def main():
         save_dir.mkdir(exist_ok=True)
         config.train_config.start_datetime = str(datetime.datetime.utcnow())
         print("Starting training repeat {}".format(i))
-        # save_product_name_vocabulary(product_name_to_int, save_dir)
+
         save_config(config, save_dir)
         copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
         save_category_vocabulary(category_to_id, save_dir)
-        save_ingredient_vocabulary(ingredient_to_id, save_dir)
 
         X_train, y_train = generate_data_partial(train_df)
         X_val, y_val = generate_data_partial(val_df)
