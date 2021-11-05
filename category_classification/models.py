@@ -6,6 +6,7 @@ from typing import List, Optional, Union
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+import pandas as pd
 
 from .constants import NUTRIMENTS
 
@@ -20,7 +21,7 @@ class TrainConfig:
     end_datetime: Union[datetime.datetime, None, str] = None
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass  # parameterise this config?
 class TextPreprocessingConfig:
     lower: bool
     strip_accent: bool
@@ -37,7 +38,6 @@ class ModelConfig:
     product_name_max_length: int
     hidden_dim: int
     hidden_dropout: float
-    output_dim: Optional[int] = None
     product_name_voc_size: Optional[int] = None
     ingredient_voc_size: Optional[int] = None
     nutriment_input: bool = False
@@ -54,14 +54,57 @@ class Config:
     ingredient_min_count: int = 0
 
 
-def build_model(config: ModelConfig) -> keras.Model:
+@tf.keras.utils.register_keras_serializable()
+class OutputMapperLayer(layers.Layer):
+    '''
+        The OutputMapperLayer converts the label indices produced by the model to
+        the taxonomy category ids and limits them to top N labels.
+    '''
+    def __init__(self, labels: List[str], top_n: int, **kwargs):
+        self.labels = labels
+        self.top_n = top_n
+
+        super(OutputMapperLayer, self).__init__(**kwargs)
+
+    def call(self, x):
+        batch_size = tf.shape(x)[0]
+
+        tf_labels = tf.constant([self.labels], dtype="string")
+        tf_labels = tf.tile(tf_labels, [batch_size, 1])
+
+        top_n = tf.nn.top_k(x, k=self.top_n, sorted=True, name="top_k").indices
+
+        top_conf = tf.gather(x, top_n, batch_dims=1)
+        top_labels = tf.gather(tf_labels, top_n, batch_dims=1)
+
+        return [top_conf, top_labels]
+
+    def compute_output_shape(self, input_shape):
+        batch_size = input_shape[0]
+        top_shape = (batch_size, self.top_n)
+        return [top_shape, top_shape]
+
+    def get_config(self):
+        config={'labels': self.labels, 'top_n': self.top_n}
+        base_config = super(OutputMapperLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
     ingredient_input = keras.Input(shape=(config.ingredient_voc_size), dtype=tf.float32)
-    product_name_input = keras.Input(shape=(config.product_name_max_length))
+    product_name_input = keras.Input(shape=(1,), dtype=tf.string, name="product_name")
+
+    # max_tokens is chosen somewhat arbitrarily. TODO(kulizhsy): investigate if it could be better.
+    product_name_preprocessing = tf.keras.layers.TextVectorization(split='whitespace', max_tokens=12000)
+    product_name_preprocessing.adapt(train_data.product_name)
+
+    product_name_layer = product_name_preprocessing(product_name_input)
+
     product_name_embedding = layers.Embedding(
-        input_dim=config.product_name_voc_size + 1,
+        # TODO(ykulizhskaya): should this value be set to +1?
+        input_dim=product_name_preprocessing.vocabulary_size() + 1,
         output_dim=config.product_name_embedding_size,
         mask_zero=False,
-    )(product_name_input)
+    )(product_name_layer)
     product_name_lstm = layers.Bidirectional(
         layers.LSTM(
             units=config.product_name_lstm_units,
@@ -86,12 +129,6 @@ def build_model(config: ModelConfig) -> keras.Model:
     output = layers.Dense(config.output_dim, activation="sigmoid")(hidden)
     return keras.Model(inputs=inputs, outputs=[output])
 
-
-@contextlib.contextmanager
-def use_params(model: keras.Model, weights: List):
-    old_weights = model.get_weights()
-    model.set_weights(weights)
-    try:
-        yield
-    finally:
-        model.set_weights(old_weights)
+def to_serving_model(base_model: keras.Model, categories: List[str]) -> keras.Model:  # serialise with the initial model.
+    mapper_layer = OutputMapperLayer(categories, 50)(base_model.output)
+    return keras.Model(base_model.input, mapper_layer)

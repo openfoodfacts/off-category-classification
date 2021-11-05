@@ -85,24 +85,24 @@ def generate_data_from_df(
     df: pd.DataFrame,
     ingredient_to_id: Dict,
     category_to_id: Dict,
-    product_name_token_to_int: Dict[str, int],
+    # product_name_token_to_int: Dict[str, int],
     nlp,
-    product_name_max_length: int,
-    product_name_preprocessing_config: TextPreprocessingConfig,
+    # product_name_max_length: int,
+    # product_name_preprocessing_config: TextPreprocessingConfig,
     nutriment_input: bool,
 ):
     ingredient_matrix = process_ingredients(
         df.known_ingredient_tags, ingredient_to_id
     ).astype(np.float32)
-    product_name_matrix = process_product_name(
-        df.product_name,
-        nlp=nlp,
-        token_to_int=product_name_token_to_int,
-        max_length=product_name_max_length,
-        preprocessing_config=product_name_preprocessing_config,
-    )
+    # product_name_matrix = process_product_name(
+    #     df.product_name,
+    #     nlp=nlp,
+    #     token_to_int=product_name_token_to_int,
+    #     max_length=product_name_max_length,
+    #     preprocessing_config=product_name_preprocessing_config,
+    # )
 
-    inputs = [ingredient_matrix, product_name_matrix]
+    inputs = [ingredient_matrix, df.product_name]
 
     if nutriment_input:
         nutriments_matrix = process_nutriments(df.nutriments)

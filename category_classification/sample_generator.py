@@ -4,7 +4,7 @@ import operator
 import pathlib
 from typing import Dict
 
-from bokeh.plotting import show
+from bokeh.plotting import save
 import pandas as pd
 from robotoff.taxonomy import Taxonomy
 from robotoff.utils import gzip_jsonl_iter
@@ -30,7 +30,7 @@ from utils.preprocess import get_nlp
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("model_path", type=pathlib.Path, default= pathlib.Path(__file__).parent / "weights/saved_model")
+    parser.add_argument("model_path", type=pathlib.Path, default= pathlib.Path(__file__).parent / "weights/0/saved_model")
     return parser.parse_args()
 
 def main():
@@ -51,8 +51,6 @@ def main():
     product_name_vocabulary = load_product_name_vocabulary(model_dir)
     model = keras.models.load_model(str(args.model_path))
 
-    analysis_model = generate_analysis_model(model, "dense")
-
     generate_data_partial = functools.partial(
         generate_data_from_df,
         ingredient_to_id=ingredient_to_id,
@@ -64,57 +62,44 @@ def main():
         nutriment_input=config.model_config.nutriment_input,
     )
 
-    val_df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_XX_VAL_PATH))
+    val_df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_XX_TEST_PATH))
 
     category_taxonomy: Taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
-
-    val_df["deepest_categories"] = get_deepest_categories(
-        category_taxonomy, val_df.categories_tags
-    )
 
     X_val, y_val = generate_data_partial(val_df)
 
     y_pred_val = model.predict(X_val)
 
-    val_df["predicted_deepest_categories"] = get_deepest_categories(
-        category_taxonomy,
-        [
-            [category_names[i] for i, conf in enumerate(y) if conf >= 0.5]
+    predicted = [
+            [{category_names[i]: conf} for i, conf in sorted(enumerate(y)) if conf >= 0.5]
             for y in y_pred_val
-        ],
-    )
+        ]
 
-    val_df["is_correct"] = [
-        source == predicted
-        for source, predicted in zip(
-            val_df.deepest_categories, val_df.predicted_deepest_categories
-        )
-    ]
-
-    error_categories_val = [
-        get_error_category(predicted, true, category_taxonomy)
-        for predicted, true in zip(
-            val_df.predicted_deepest_categories, val_df.deepest_categories
-        )
-    ]
-
-    (
-        val_df["missing_cat_error"],
-        val_df["additional_cat_error"],
-        val_df["over_pred_cat_error"],
-        val_df["under_pred_cat_error"],
-    ) = zip(*error_categories_val)
+    val_df["predicted categories"] = [[p for p in preds if next(iter(p)) in categories]
+        for preds, categories in zip(predicted, val_df.categories_tags)]
 
 
-    val_df["url"] = [
-        "https://world.openfoodfacts.org/product/{}".format(c) for c in val_df.code
-    ]
-    val_df.to_csv(str(model_dir / "error_analysis.tsv"), sep="\t")
+    val_df["wrong prediction"] = [[p for p in preds if next(iter(p)) not in categories]
+            for preds, categories in zip(predicted, val_df.categories_tags)]
 
-    emb_val = analysis_model.predict(X_val)
+    val_df["missed prediction"] = [[category for category in categories if category not in [next(iter(d)) for d in preds]]
+        for preds, categories in zip(predicted, val_df.categories_tags)]
 
-    p = get_interactive_embedding_plot(emb_val, val_df)
-    show(p)
+    val_df = val_df[(val_df["wrong prediction"].map(len) > 0) | (val_df["missed prediction"].map(len) > 0)]
+
+    val_df.drop(["nutriments", "images", "product_name", "lang", "categories_tags", "ingredient_tags", "ingredients_text", "known_ingredient_tags"], axis=1, inplace=True)
+
+    val_df.rename(columns={"code": "barcode"}, inplace=True)
+
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_colwidth', None)
+
+    val_df.head(n=100).to_csv('misprediction_sample.csv')
+
+
+
     #
     # report_val, clf_report_val = evaluation_report(y_val, y_pred_val,
     #                                                taxonomy=category_taxonomy,

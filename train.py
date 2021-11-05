@@ -11,6 +11,7 @@ import dacite
 from robotoff.taxonomy import Taxonomy
 from tensorflow import keras
 from tensorflow.keras import callbacks
+import pandas as pd
 
 from category_classification.data_utils import create_dataframe, generate_data_from_df
 from category_classification.models import build_model, Config
@@ -49,8 +50,8 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_model(config: Config) -> keras.Model:
-    model = build_model(config.model_config)
+def create_model(config: Config, train_data: pd.DataFrame) -> keras.Model:
+    model = build_model(config.model_config, train_data)
     loss_fn = keras.losses.BinaryCrossentropy(
         label_smoothing=config.train_config.label_smoothing
     )
@@ -104,11 +105,12 @@ def train(
         callbacks=[
             callbacks.TerminateOnNaN(),
             callbacks.ModelCheckpoint(
-                filepath=str(save_dir / "weights.{epoch:02d}-{val_loss:.4f}.hdf5"),
+                filepath=str(save_dir / "weights.{epoch:02d}-{val_loss:.4f}"),
                 monitor="val_loss",
-                save_best_only=True,
+                save_best_only=False, # used to be true
+                save_format='tf',
             ),
-            callbacks.TensorBoard(log_dir=str(temporary_log_dir), histogram_freq=2, profile_batch = '500, 510'),
+            callbacks.TensorBoard(log_dir=str(temporary_log_dir), histogram_freq=0, profile_batch = '500, 510'),
             callbacks.EarlyStopping(monitor="val_loss", patience=4),
             callbacks.CSVLogger(str(save_dir / "training.csv")),
         ],
@@ -119,9 +121,7 @@ def train(
     print("Moving log directory from {} to {}".format(temporary_log_dir, log_dir))
     shutil.move(str(temporary_log_dir), str(log_dir))
 
-    model.save(str(save_dir / "last_checkpoint.hdf5"))
-
-    last_checkpoint_path = sorted(save_dir.glob("weights.*.hdf5"))[-1]
+    last_checkpoint_path = sorted(save_dir.glob("weights.*"))[-1]
 
     print("Restoring last checkpoint {}".format(last_checkpoint_path))
     model = keras.models.load_model(str(last_checkpoint_path))
@@ -192,36 +192,36 @@ def main():
 
     nlp = get_nlp(lang=config.lang)
 
-    preprocess_product_name_func = functools.partial(
-        preprocess_product_name,
-        lower=config.product_name_preprocessing_config.lower,
-        strip_accent=config.product_name_preprocessing_config.strip_accent,
-        remove_punct=config.product_name_preprocessing_config.remove_punct,
-        remove_digit=config.product_name_preprocessing_config.remove_digit,
-    )
-    preprocessed_product_names_iter = (
-        preprocess_product_name_func(product_name)
-        for product_name in train_df.product_name
-    )
-    train_tokens_iter = tokenize_batch(preprocessed_product_names_iter, nlp)
-    product_name_to_int = extract_vocabulary(
-        train_tokens_iter, config.product_name_min_count
-    )
+    # preprocess_product_name_func = functools.partial(
+    #     preprocess_product_name,
+    #     lower=config.product_name_preprocessing_config.lower,
+    #     strip_accent=config.product_name_preprocessing_config.strip_accent,
+    #     remove_punct=config.product_name_preprocessing_config.remove_punct,
+    #     remove_digit=config.product_name_preprocessing_config.remove_digit,
+    # )
+    # preprocessed_product_names_iter = (
+    #     preprocess_product_name_func(product_name)
+    #     for product_name in train_df.product_name
+    # )
+    # train_tokens_iter = tokenize_batch(preprocessed_product_names_iter, nlp)
+    # product_name_to_int = extract_vocabulary(
+    #     train_tokens_iter, config.product_name_min_count
+    # )
 
     model_config.ingredient_voc_size = len(ingredient_to_id)
     model_config.output_dim = len(category_to_id)
-    model_config.product_name_voc_size = len(product_name_to_int)
+    # model_config.product_name_voc_size = len(product_name_to_int)
 
-    print("Selected vocabulary: {}".format(len(product_name_to_int)))
+    # print("Selected vocabulary: {}".format(len(product_name_to_int)))
 
     generate_data_partial = functools.partial(
         generate_data_from_df,
         ingredient_to_id=ingredient_to_id,
         category_to_id=category_to_id,
-        product_name_max_length=model_config.product_name_max_length,
-        product_name_token_to_int=product_name_to_int,
+        # product_name_max_length=model_config.product_name_max_length,
+        # product_name_token_to_int=product_name_to_int,
         nlp=nlp,
-        product_name_preprocessing_config=config.product_name_preprocessing_config,
+        # product_name_preprocessing_config=config.product_name_preprocessing_config,
         nutriment_input=config.model_config.nutriment_input,
     )
 
@@ -232,11 +232,11 @@ def main():
         save_dirs = [output_dir / str(i) for i in range(replicates)]
 
     for i, save_dir in enumerate(save_dirs):
-        model = create_model(config)
+        model = create_model(config, train_df)
         save_dir.mkdir(exist_ok=True)
         config.train_config.start_datetime = str(datetime.datetime.utcnow())
         print("Starting training repeat {}".format(i))
-        save_product_name_vocabulary(product_name_to_int, save_dir)
+        # save_product_name_vocabulary(product_name_to_int, save_dir)
         save_config(config, save_dir)
         copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
         save_category_vocabulary(category_to_id, save_dir)
