@@ -6,7 +6,6 @@ from typing import Set
 
 import pandas as pd
 from sklearn.feature_extraction.text import strip_accents_ascii
-from sklearn.preprocessing import MultiLabelBinarizer
 from spacy.lang.en import English
 from spacy.lang.fr import French
 
@@ -30,7 +29,7 @@ def count_categories(df: pd.DataFrame) -> Dict:
 def count_ingredients(df: pd.DataFrame) -> Dict:
     ingredients_count = defaultdict(int)
 
-    for ingredients in df.known_ingredient_tags:
+    for ingredients in df.ingredient_tags:
         for ingredient in ingredients:
             ingredients_count[ingredient] += 1
 
@@ -108,13 +107,3 @@ def extract_vocabulary_from_counter(
         offset += 1
 
     return token_to_int
-
-
-def generate_y(categories_tags: Iterable[Iterable[str]], category_to_id: Dict):
-    category_count = len(category_to_id)
-    cat_binarizer = MultiLabelBinarizer(classes=list(range(category_count)))
-    category_int = [
-        [category_to_id[cat] for cat in product_categories if cat in category_to_id]
-        for product_categories in categories_tags
-    ]
-    return cat_binarizer.fit_transform(category_int)

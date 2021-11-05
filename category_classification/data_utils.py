@@ -1,90 +1,55 @@
 from collections import defaultdict
 import dataclasses
 import pathlib
-from typing import Any, Callable, Dict, Iterable, Optional
+from typing import Any, Callable, Dict, Iterable, Optional, List
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from robotoff.utils import gzip_jsonl_iter
 from sklearn.preprocessing import MultiLabelBinarizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.layers.experimental import preprocessing
 
 from category_classification.models import TextPreprocessingConfig
 import settings
 from utils.constant import UNK_TOKEN
 from utils.preprocess import (
     extract_vocabulary_from_counter,
-    generate_y,
     preprocess_product_name,
     tokenize,
 )
 from .constants import NUTRIMENTS, NUTRIMENTS_TO_IDX
 
 
-def create_dataframe(split: str, lang: str) -> pd.DataFrame:
-    if split not in ("train", "test", "val"):
-        raise ValueError("split must be either 'train', 'test' or 'val'")
-
-    file_name = "category_{}.{}.jsonl.gz".format(lang, split)
-    full_path = settings.DATA_DIR / file_name
-    return pd.DataFrame(iter_product(full_path))
+def create_dataframes() -> Dict[str, pd.DataFrame]:
+    dfs = {}
+    for split in ("train", "test", "val"):
+        file_name = "category_xx.{}.jsonl.gz".format(split)
+        full_path = settings.DATA_DIR / file_name
+        dfs[split] = pd.DataFrame(iter_product(full_path))
+    return dfs
 
 
 def iter_product(data_path: pathlib.Path):
-    for product in gzip_jsonl_iter(data_path):
-        product.pop("images", None)
+    for product in gzip_jsonl_iter(data_path): 
+        # Filter out fields we don't need.
+        filtered_product = {key: product[key] for key in {"product_name", "categories_tags","ingredient_tags", "nutriments"}}
 
-        if "nutriments" in product:
-            nutriments = product["nutriments"] or {}
+        # Filter for only supported nutriments.
+        if "nutriments" in filtered_product:
+            nutriments = filtered_product["nutriments"] or {}
             for key in list(nutriments.keys()):
                 if key not in NUTRIMENTS:
                     nutriments.pop(key)
 
-        yield product
-
-
-def analyze_dataset(
-    data_path: pathlib.Path,
-    min_category_count: int,
-    min_ingredient_count: int,
-    product_name_min_count: int,
-    product_name_process_fn: Callable,
-):
-    category_count: Dict[str, int] = defaultdict(int)
-    ingredient_count: Dict[str, int] = defaultdict(int)
-    vocabulary: Dict[str, int] = defaultdict(int)
-
-    for product in iter_product(data_path):
-        product_name = product.get("product_name", "") or ""
-        tokens = product_name_process_fn(product_name)
-
-        for token in tokens:
-            vocabulary[token] += 1
-
-        for category in product["categories_tags"]:
-            category_count[category] += 1
-
-        for ingredient_tag in product.get("ingredients_tags", []) or []:
-            ingredient_count[ingredient_tag] += 1
-
-    category_to_id = filter_min_count(category_count, min_category_count)
-    ingredient_to_id = filter_min_count(ingredient_count, min_ingredient_count)
-    token_to_id = extract_vocabulary_from_counter(vocabulary, product_name_min_count)
-
-    return category_to_id, ingredient_to_id, token_to_id
-
-
-def filter_min_count(counter: Dict[str, int], min_count: int):
-    selected = sorted(
-        set((cat for cat, count in counter.items() if count >= min_count))
-    )
-    return {name: idx for idx, name in enumerate(selected)}
-
+        yield filtered_product
+        break
 
 def generate_data_from_df(
     df: pd.DataFrame,
     category_to_id: Dict,
-    nlp,
+    categories: List[str],
     nutriment_input: bool,
 ):
 
@@ -94,37 +59,17 @@ def generate_data_from_df(
         nutriments_matrix = process_nutriments(df.nutriments)
         inputs.append(nutriments_matrix)
 
+
+    # categoriser = preprocessing.StringLookup(vocabulary=categories)
+
+    # print(f"Vocabulary is {categoriser.get_vocabulary()}")
+
+    # print(f"Category tags are {df.categories_tags}")
+    # y = categoriser(tf.constant(df.categories_tags))
+    # print(y)
+    # print("\n\n")
     y = generate_y(df.categories_tags, category_to_id)
     return inputs, y
-
-
-def generate_data(
-    product: Dict[str, Any],
-    ingredient_to_id: Dict,
-    product_name_token_to_int: Dict[str, int],
-    nlp,
-    product_name_max_length: int,
-    product_name_preprocessing_config: TextPreprocessingConfig,
-    nutriment_input: bool,
-):
-    ingredient_tags = product.get("ingredients_tags", []) or []
-    product_name = product.get("product_name", "") or ""
-    nutriments = product.get("nutriments") or None
-    ingredient_matrix = process_ingredients([list(ingredient_tags)], ingredient_to_id)
-    product_name_matrix = process_product_name(
-        [product_name],
-        nlp=nlp,
-        token_to_int=product_name_token_to_int,
-        max_length=product_name_max_length,
-        preprocessing_config=product_name_preprocessing_config,
-    )
-
-    inputs = [ingredient_matrix, product_name_matrix]
-    if nutriment_input:
-        nutriments_matrix = process_nutriments([nutriments])
-        inputs.append(nutriments_matrix)
-
-    return inputs
 
 
 def process_ingredients(

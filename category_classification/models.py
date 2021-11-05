@@ -53,7 +53,6 @@ class Config:
     category_min_count: int = 0
     ingredient_min_count: int = 0
 
-
 @tf.keras.utils.register_keras_serializable()
 class OutputMapperLayer(layers.Layer):
     '''
@@ -105,6 +104,7 @@ def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
         output_dim=config.product_name_embedding_size,
         mask_zero=False,
     )(product_name_layer)
+
     product_name_lstm = layers.Bidirectional(
         layers.LSTM(
             units=config.product_name_lstm_units,
@@ -131,7 +131,7 @@ def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
     hidden = layers.Dense(config.hidden_dim)(concat)
     hidden = layers.Dropout(config.hidden_dropout)(hidden)
     hidden = layers.Activation("relu")(hidden)
-    output = layers.Dense(config.output_dim, activation="sigmoid")(hidden)
+    output = layers.Dense(output_dim, activation="sigmoid")(hidden)
     return keras.Model(inputs=inputs, outputs=[output])
 
 def to_serving_model(base_model: keras.Model, categories: List[str]) -> keras.Model:  # serialise with the initial model.
