@@ -111,13 +111,11 @@ def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
         )
     )(product_name_embedding)
 
-    ingredient_preprocessing = tf.keras.layers.StringLookup(max_tokens=335)
+    ingredient_preprocessing = tf.keras.layers.StringLookup(max_tokens=335, output_mode="multi_hot")
 
     ingredient_preprocessing.adapt(tf.ragged.constant(train_data.ingredient_tags))
 
     ingredient_layer = ingredient_preprocessing(ingredient_input)
-    print(ingredient_layer)
-    ingredient_layer = tf.keras.backend.cast(ingredient_layer, dtype='float32')
 
     inputs = [ingredient_input, product_name_input]
     concat_input = [ingredient_layer, product_name_lstm]
@@ -132,9 +130,10 @@ def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
     hidden = layers.Dense(config.hidden_dim)(concat)
     hidden = layers.Dropout(config.hidden_dropout)(hidden)
     hidden = layers.Activation("relu")(hidden)
-    output = layers.Dense(output_dim, activation="sigmoid")(hidden)
+    output = layers.Dense(config.output_dim, activation="sigmoid")(hidden)
     return keras.Model(inputs=inputs, outputs=[output])
 
-def to_serving_model(base_model: keras.Model, categories: List[str]) -> keras.Model:  # serialise with the initial model.
+
+def to_serving_model(base_model: keras.Model, categories: List[str]) -> keras.Model:
     mapper_layer = OutputMapperLayer(categories, 50)(base_model.output)
     return keras.Model(base_model.input, mapper_layer)

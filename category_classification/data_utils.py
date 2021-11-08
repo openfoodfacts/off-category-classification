@@ -10,6 +10,7 @@ from robotoff.utils import gzip_jsonl_iter
 from sklearn.preprocessing import MultiLabelBinarizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.layers.experimental import preprocessing
+from sklearn.preprocessing import MultiLabelBinarizer
 
 from category_classification.models import TextPreprocessingConfig
 import settings
@@ -40,7 +41,6 @@ def iter_product(data_path: pathlib.Path):
             for key in list(nutriments.keys()):
                 if key not in NUTRIMENTS:
                     nutriments.pop(key)
-
         yield filtered_product
         break
 
@@ -51,8 +51,7 @@ def generate_data_from_df(
     nutriment_input: bool,
 ):
 
-    inputs = [df.ingredients, df.product_name]
-
+    inputs = [tf.ragged.constant(df.ingredient_tags, dtype=tf.string), tf.constant(df.product_name, dtype=tf.string)]
     if nutriment_input:
         nutriments_matrix = process_nutriments(df.nutriments)
         inputs.append(nutriments_matrix)

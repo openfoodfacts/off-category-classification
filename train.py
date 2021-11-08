@@ -85,6 +85,8 @@ def train(
     X_val, y_val = val_data
     X_test, y_test = test_data
 
+    print(model.summary())
+
     model.fit(
         X_train,
         y_train,
@@ -163,8 +165,13 @@ def main():
         x for x in sorted(category_taxonomy.keys()) if x in selected_categories
     ]
 
+    category_to_id = {name: idx for idx, name in enumerate(sorted_categories)}
+
+    model_config.output_dim = len(category_to_id)
+
     generate_data_partial = functools.partial(
         generate_data_from_df,
+        category_to_id=category_to_id,
         categories=sorted_categories,
         nutriment_input=config.model_config.nutriment_input,
     )
@@ -201,7 +208,7 @@ def main():
             save_dir,
             config,
             category_taxonomy,
-            category_names,
+            sorted_categories,
         )
 
         config.train_config.end_datetime = str(datetime.datetime.utcnow())

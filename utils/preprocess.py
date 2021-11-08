@@ -3,6 +3,7 @@ import operator
 import re
 from typing import Dict, Iterable
 from typing import Set
+from sklearn.preprocessing import MultiLabelBinarizer
 
 import pandas as pd
 from sklearn.feature_extraction.text import strip_accents_ascii
