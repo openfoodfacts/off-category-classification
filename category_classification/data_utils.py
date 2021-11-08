@@ -42,7 +42,6 @@ def iter_product(data_path: pathlib.Path):
                 if key not in NUTRIMENTS:
                     nutriments.pop(key)
         yield filtered_product
-        break
 
 def generate_data_from_df(
     df: pd.DataFrame,
