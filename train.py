@@ -9,12 +9,16 @@ from typing import List
 
 import dacite
 from robotoff.taxonomy import Taxonomy
+import tensorflow as tf
 from tensorflow import keras
+from tensorflow.data import Dataset
+import pandas as pd
+
 from tensorflow.keras import callbacks
 import pandas as pd
 
-from category_classification.data_utils import create_dataframe, generate_data_from_df
-from category_classification.models import build_model, Config
+from category_classification.data_utils import create_dataframes, generate_data_from_df
+from category_classification.models import build_model, to_serving_model, Config
 import settings
 from utils import update_dict_dot
 from utils.io import (
@@ -28,11 +32,6 @@ from utils.io import (
 from utils.metrics import evaluation_report
 from utils.preprocess import (
     count_categories,
-    count_ingredients,
-    extract_vocabulary,
-    get_nlp,
-    preprocess_product_name,
-    tokenize_batch,
 )
 
 
@@ -41,12 +40,8 @@ def parse_args():
     parser.add_argument("config", type=pathlib.Path)
     parser.add_argument("output_dir", type=pathlib.Path)
     parser.add_argument(
-        "--extra-params", help="extra parameters updating the base configuration"
-    )
-    parser.add_argument(
         "--repeat", type=int, default=1, help="number of replicates to run"
     )
-    parser.add_argument("--lang", type=str, default="xx")
     return parser.parse_args()
 
 
@@ -67,12 +62,6 @@ def create_model(config: Config, train_data: pd.DataFrame) -> keras.Model:
 def get_config(args) -> Config:
     with args.config.open("r") as f:
         config_dict = json.load(f)
-
-    config_dict["lang"] = args.lang
-
-    if args.extra_params:
-        print("Extra parameters: {}".format(args.extra_params))
-        update_dict_dot(config_dict, args.extra_params)
 
     print("Full configuration:\n{}".format(json.dumps(config_dict, indent=4)))
     return dacite.from_dict(Config, config_dict)
@@ -121,10 +110,10 @@ def train(
     print("Moving log directory from {} to {}".format(temporary_log_dir, log_dir))
     shutil.move(str(temporary_log_dir), str(log_dir))
 
-    last_checkpoint_path = sorted(save_dir.glob("weights.*"))[-1]
+    print("Saving the base and the serving model {}".format(save_dir))
+    model.save(str(save_dir / "base/saved_model"))
 
-    print("Restoring last checkpoint {}".format(last_checkpoint_path))
-    model = keras.models.load_model(str(last_checkpoint_path))
+    to_serving_model(model, category_names).save(str(save_dir / "serving/saved_model"))
 
     print("Evaluating on validation dataset")
     y_pred_val = model.predict(X_val)
@@ -135,6 +124,7 @@ def train(
     save_json(report, save_dir / "metrics_val.json")
     save_json(clf_report, save_dir / "classification_report_val.json")
 
+    print("Evaluating on test dataset")
     y_pred_test = model.predict(X_test)
     report, clf_report = evaluation_report(
         y_test, y_pred_test, taxonomy=category_taxonomy, category_names=category_names
@@ -154,9 +144,8 @@ def main():
 
     category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
 
-    train_df = create_dataframe("train", args.lang)
-    test_df = create_dataframe("test", args.lang)
-    val_df = create_dataframe("val", args.lang)
+    dfs = create_dataframes()
+    train_df, test_df, val_df = dfs["train"], dfs["test"], dfs["val"]
 
     categories_count = count_categories(train_df)
 
@@ -170,20 +159,18 @@ def main():
 
     print("{} categories selected".format(len(selected_categories)))
 
-    category_names = [
+    sorted_categories = [
         x for x in sorted(category_taxonomy.keys()) if x in selected_categories
     ]
 
-    category_to_id = {name: idx for idx, name in enumerate(category_names)}
-
-    nlp = get_nlp(lang=config.lang)
+    category_to_id = {name: idx for idx, name in enumerate(sorted_categories)}
 
     model_config.output_dim = len(category_to_id)
 
     generate_data_partial = functools.partial(
         generate_data_from_df,
         category_to_id=category_to_id,
-        nlp=nlp,
+        categories=sorted_categories,
         nutriment_input=config.model_config.nutriment_input,
     )
 
@@ -195,6 +182,7 @@ def main():
 
     for i, save_dir in enumerate(save_dirs):
         model = create_model(config, train_df)
+
         save_dir.mkdir(exist_ok=True)
         config.train_config.start_datetime = str(datetime.datetime.utcnow())
         print("Starting training repeat {}".format(i))
@@ -203,8 +191,11 @@ def main():
         copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
         save_category_vocabulary(category_to_id, save_dir)
 
+        print("Processing training data")
         X_train, y_train = generate_data_partial(train_df)
+        print("Processing validation data")
         X_val, y_val = generate_data_partial(val_df)
+        print("Processing test data")
         X_test, y_test = generate_data_partial(test_df)
 
         train(
@@ -215,7 +206,7 @@ def main():
             save_dir,
             config,
             category_taxonomy,
-            category_names,
+            sorted_categories,
         )
 
         config.train_config.end_datetime = str(datetime.datetime.utcnow())

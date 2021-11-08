@@ -77,9 +77,7 @@ def evaluation_report(
         y_pred_int, taxonomy=taxonomy, category_names=category_names
     )
 
-    clf_report = classification_report(
-        y_true, y_pred_int, target_names=category_names, output_dict=True
-    )
+    clf_report = None
 
     report = {}
 
@@ -91,13 +89,5 @@ def evaluation_report(
         for average in ("micro", "macro"):
             metric_value = metric_func(y_true, y_pred_int, average=average)
             report["{}-{}".format(average, metric)] = metric_value
-
-            metric_value_filled = metric_func(
-                y_true, y_pred_int_filled, average=average
-            )
-            report["ancestor-{}-{}".format(average, metric)] = metric_value_filled
-
-    hierarchical_metrics = hierarchical_precision_recall_f1(y_true, y_pred_int_filled)
-    report.update(hierarchical_metrics)
 
     return report, clf_report
