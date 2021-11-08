@@ -135,6 +135,7 @@ def train(
     save_json(report, save_dir / "metrics_val.json")
     save_json(clf_report, save_dir / "classification_report_val.json")
 
+    print("Evaluating on test dataset")
     y_pred_test = model.predict(X_test)
     report, clf_report = evaluation_report(
         y_test, y_pred_test, taxonomy=category_taxonomy, category_names=category_names

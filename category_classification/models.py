@@ -54,14 +54,48 @@ class Config:
     ingredient_min_count: int = 0
 
 
+
+@tf.keras.utils.register_keras_serializable()
+class OutputMapperLayer(layers.Layer):
+    '''
+        The OutputMapperLayer converts the label indices produced by the model to
+        the taxonomy category ids and limits them to top N labels.
+    '''
+    def __init__(self, labels: List[str], top_n: int, **kwargs):
+        self.labels = labels
+        self.top_n = top_n
+
+        super(OutputMapperLayer, self).__init__(**kwargs)
+
+    def call(self, x):
+        batch_size = tf.shape(x)[0]
+
+        tf_labels = tf.constant([self.labels], dtype="string")
+        tf_labels = tf.tile(tf_labels, [batch_size, 1])
+
+        top_n = tf.nn.top_k(x, k=self.top_n, sorted=True, name="top_k").indices
+
+        top_conf = tf.gather(x, top_n, batch_dims=1)
+        top_labels = tf.gather(tf_labels, top_n, batch_dims=1)
+
+        return [top_conf, top_labels]
+
+
 def build_model(config: ModelConfig) -> keras.Model:
-    ingredient_input = keras.Input(shape=(config.ingredient_voc_size), dtype=tf.float32)
-    product_name_input = keras.Input(shape=(config.product_name_max_length))
+    ingredient_input = keras.Input(shape=(config.ingredient_voc_size), dtype=tf.float32, name="ingredients")
+    product_name_input = keras.Input(shape=(1,), dtype=tf.string, name="product_name")
+
+    # max_tokens is chosen somewhat arbitrarily. TODO(kulizhsy): investigate if it could be better.
+    product_name_preprocessing = tf.keras.layers.TextVectorization(split='whitespace', max_tokens=93000, output_sequence_length=config.product_name_max_length)
+    product_name_preprocessing.adapt(train_data.product_name)
+
+    product_name_layer = product_name_preprocessing(product_name_input)
+
     product_name_embedding = layers.Embedding(
-        input_dim=config.product_name_voc_size + 1,
+        input_dim=93000,
         output_dim=config.product_name_embedding_size,
         mask_zero=False,
-    )(product_name_input)
+    )(product_name_layer)
     product_name_lstm = layers.Bidirectional(
         layers.LSTM(
             units=config.product_name_lstm_units,
@@ -70,8 +104,13 @@ def build_model(config: ModelConfig) -> keras.Model:
         )
     )(product_name_embedding)
 
+    ingredient_preprocessing = tf.keras.layers.StringLookup(max_tokens=335, output_mode="multi_hot")
+    ingredient_preprocessing.adapt(tf.ragged.constant(train_data.ingredient_tags))
+
+    ingredient_layer = ingredient_preprocessing(ingredient_input)
+
     inputs = [ingredient_input, product_name_input]
-    concat_input = [ingredient_input, product_name_lstm]
+    concat_input = [ingredient_layer, product_name_lstm]
 
     if config.nutriment_input:
         nutriment_input = layers.Input(shape=len(NUTRIMENTS))
@@ -86,12 +125,6 @@ def build_model(config: ModelConfig) -> keras.Model:
     output = layers.Dense(config.output_dim, activation="sigmoid")(hidden)
     return keras.Model(inputs=inputs, outputs=[output])
 
-
-@contextlib.contextmanager
-def use_params(model: keras.Model, weights: List):
-    old_weights = model.get_weights()
-    model.set_weights(weights)
-    try:
-        yield
-    finally:
-        model.set_weights(old_weights)
+def to_serving_model(base_model: keras.Model, categories: List[str]) -> keras.Model:
+    mapper_layer = OutputMapperLayer(categories, 50)(base_model.output)
+    return keras.Model(base_model.input, mapper_layer)
