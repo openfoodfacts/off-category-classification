@@ -97,8 +97,9 @@ def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
 
     product_name_layer = product_name_preprocessing(product_name_input)
 
+
     product_name_embedding = layers.Embedding(
-        input_dim=config.product_name_max_length,
+        input_dim=93000,
         output_dim=config.product_name_embedding_size,
         mask_zero=False,
     )(product_name_layer)
@@ -112,7 +113,6 @@ def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
     )(product_name_embedding)
 
     ingredient_preprocessing = tf.keras.layers.StringLookup(max_tokens=335, output_mode="multi_hot")
-
     ingredient_preprocessing.adapt(tf.ragged.constant(train_data.ingredient_tags))
 
     ingredient_layer = ingredient_preprocessing(ingredient_input)
