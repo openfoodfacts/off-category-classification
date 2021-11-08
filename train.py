@@ -32,11 +32,6 @@ from utils.io import (
 from utils.metrics import evaluation_report
 from utils.preprocess import (
     count_categories,
-    count_ingredients,
-    extract_vocabulary,
-    get_nlp,
-    preprocess_product_name,
-    tokenize_batch,
 )
 
 
@@ -167,9 +162,6 @@ def main():
     sorted_categories = [
         x for x in sorted(category_taxonomy.keys()) if x in selected_categories
     ]
-    print(sorted_categories)
-
-    nlp = get_nlp(lang=config.lang) # remove this as well?
 
     generate_data_partial = functools.partial(
         generate_data_from_df,

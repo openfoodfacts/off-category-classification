@@ -15,9 +15,7 @@ from category_classification.models import TextPreprocessingConfig
 import settings
 from utils.constant import UNK_TOKEN
 from utils.preprocess import (
-    extract_vocabulary_from_counter,
-    preprocess_product_name,
-    tokenize,
+    generate_y
 )
 from .constants import NUTRIMENTS, NUTRIMENTS_TO_IDX
 
@@ -70,43 +68,6 @@ def generate_data_from_df(
     # print("\n\n")
     y = generate_y(df.categories_tags, category_to_id)
     return inputs, y
-
-
-def process_ingredients(
-    ingredients: Iterable[Iterable[str]], ingredient_to_id: Dict[str, int]
-) -> np.ndarray:
-    ingredient_count = len(ingredient_to_id)
-    ingredient_binarizer = MultiLabelBinarizer(classes=list(range(ingredient_count)))
-    ingredient_int = [
-        [
-            ingredient_to_id[ing]
-            for ing in product_ingredients
-            if ing in ingredient_to_id
-        ]
-        for product_ingredients in ingredients
-    ]
-    return ingredient_binarizer.fit_transform(ingredient_int)
-
-
-def process_product_name(
-    product_names: Iterable[str],
-    nlp,
-    token_to_int: Dict,
-    max_length: int,
-    preprocessing_config: TextPreprocessingConfig,
-) -> np.ndarray:
-    tokens_all = [
-        tokenize(
-            preprocess_product_name(text, **dataclasses.asdict(preprocessing_config)),
-            nlp,
-        )
-        for text in product_names
-    ]
-    tokens_int = [
-        [token_to_int[t if t in token_to_int else UNK_TOKEN] for t in tokens]
-        for tokens in tokens_all
-    ]
-    return pad_sequences(tokens_int, max_length)
 
 
 def get_nutriment_value(nutriments: Dict[str, Any], nutriment_name: str) -> float:
