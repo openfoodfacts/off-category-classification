@@ -22,6 +22,6 @@
     },
     "lang": "xx",
     "product_name_min_count": 0,
-    "category_min_count": 10,
+    "category_min_count": 1,
     "ingredient_min_count": 3
 }

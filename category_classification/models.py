@@ -6,6 +6,7 @@ from typing import List, Optional, Union
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+import pandas as pd
 
 from .constants import NUTRIMENTS
 
@@ -20,7 +21,7 @@ class TrainConfig:
     end_datetime: Union[datetime.datetime, None, str] = None
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass  # parameterise this config?
 class TextPreprocessingConfig:
     lower: bool
     strip_accent: bool
@@ -37,7 +38,6 @@ class ModelConfig:
     product_name_max_length: int
     hidden_dim: int
     hidden_dropout: float
-    output_dim: Optional[int] = None
     product_name_voc_size: Optional[int] = None
     ingredient_voc_size: Optional[int] = None
     nutriment_input: bool = False
@@ -52,8 +52,6 @@ class Config:
     product_name_min_count: int
     category_min_count: int = 0
     ingredient_min_count: int = 0
-
-
 
 @tf.keras.utils.register_keras_serializable()
 class OutputMapperLayer(layers.Layer):
@@ -80,22 +78,32 @@ class OutputMapperLayer(layers.Layer):
 
         return [top_conf, top_labels]
 
+    def compute_output_shape(self, input_shape):
+        batch_size = input_shape[0]
+        top_shape = (batch_size, self.top_n)
+        return [top_shape, top_shape]
 
-def build_model(config: ModelConfig) -> keras.Model:
-    ingredient_input = keras.Input(shape=(config.ingredient_voc_size), dtype=tf.float32, name="ingredients")
+    def get_config(self):
+        config={'labels': self.labels, 'top_n': self.top_n}
+        base_config = super(OutputMapperLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
+    ingredient_input = keras.Input(shape=(None,), dtype=tf.string, name="ingredient")
     product_name_input = keras.Input(shape=(1,), dtype=tf.string, name="product_name")
 
-    # max_tokens is chosen somewhat arbitrarily. TODO(kulizhsy): investigate if it could be better.
     product_name_preprocessing = tf.keras.layers.TextVectorization(split='whitespace', max_tokens=93000, output_sequence_length=config.product_name_max_length)
     product_name_preprocessing.adapt(train_data.product_name)
 
     product_name_layer = product_name_preprocessing(product_name_input)
+
 
     product_name_embedding = layers.Embedding(
         input_dim=93000,
         output_dim=config.product_name_embedding_size,
         mask_zero=False,
     )(product_name_layer)
+
     product_name_lstm = layers.Bidirectional(
         layers.LSTM(
             units=config.product_name_lstm_units,
@@ -124,6 +132,7 @@ def build_model(config: ModelConfig) -> keras.Model:
     hidden = layers.Activation("relu")(hidden)
     output = layers.Dense(config.output_dim, activation="sigmoid")(hidden)
     return keras.Model(inputs=inputs, outputs=[output])
+
 
 def to_serving_model(base_model: keras.Model, categories: List[str]) -> keras.Model:
     mapper_layer = OutputMapperLayer(categories, 50)(base_model.output)
