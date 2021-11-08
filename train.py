@@ -85,8 +85,6 @@ def train(
     X_val, y_val = val_data
     X_test, y_test = test_data
 
-    print(model.summary())
-
     model.fit(
         X_train,
         y_train,
