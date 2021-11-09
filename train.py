@@ -121,7 +121,7 @@ def train(
                 save_best_only=True,
                 save_format='tf',
             ),
-            TBCallback(log_dir=str(temporary_log_dir), histogram_freq=1, profile_batch = '500, 510'),
+            TBCallback(log_dir=str(temporary_log_dir), histogram_freq=1),
             callbacks.EarlyStopping(monitor="val_loss", patience=4),
             callbacks.CSVLogger(str(save_dir / "training.csv")),
         ],
@@ -206,6 +206,17 @@ def main():
         nutriment_input=config.model_config.nutriment_input,
     )
 
+    print(f"Memory usage before training data generation: {process.memory_info().rss}")
+    print("Processing training data")
+    X_train, y_train = generate_data_partial(train_df)
+    print("Processing validation data")
+    X_val, y_val = generate_data_partial(val_df)
+    print("Processing test data")
+    X_test, y_test = generate_data_partial(test_df)
+    print(f"Memory usage after training data generation: {process.memory_info().rss}")
+    del dfs
+    print(f"Memory usage after deleting the original DataFrame: {process.memory_info().rss}")
+
     replicates = args.repeat
     if replicates == 1:
         save_dirs = [output_dir]
@@ -223,15 +234,6 @@ def main():
         copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
         save_category_vocabulary(category_to_id, save_dir)
 
-        print(f"Memory usage before training data generation: {process.memory_info().rss}")
-        print("Processing training data")
-        X_train, y_train = generate_data_partial(train_df)
-        print("Processing validation data")
-        X_val, y_val = generate_data_partial(val_df)
-        print("Processing test data")
-        X_test, y_test = generate_data_partial(test_df)
-
-        print(f"Memory usage after training data generation: {process.memory_info().rss}")
         train(
             (X_train, y_train),
             (X_val, y_val),
