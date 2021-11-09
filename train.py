@@ -10,6 +10,7 @@ from typing import List
 import dacite
 from robotoff.taxonomy import Taxonomy
 import tensorflow as tf
+from tensorflow.python.ops import summary_ops_v2
 from tensorflow import keras
 from tensorflow.data import Dataset
 import pandas as pd
@@ -66,6 +67,20 @@ def get_config(args) -> Config:
     print("Full configuration:\n{}".format(json.dumps(config_dict, indent=4)))
     return dacite.from_dict(Config, config_dict)
 
+class TBCallback(callbacks.TensorBoard):
+    ''' Get around a bug in using the StringLookup layers - https://github.com/tensorflow/tensorboard/issues/4530#issuecomment-783318292
+    '''
+    def _log_weights(self, epoch):
+        with self._train_writer.as_default():
+            with summary_ops_v2.always_record_summaries():
+                for layer in self.model.layers:
+                    for weight in layer.weights:
+                        if hasattr(weight, "name"):
+                            weight_name = weight.name.replace(':', '_')
+                            summary_ops_v2.histogram(weight_name, weight, step=epoch)
+                            if self.write_images:
+                                self._log_weight_as_image(weight, weight_name, epoch)
+                self._train_writer.flush()
 
 def train(
     train_data,
@@ -99,7 +114,7 @@ def train(
                 save_best_only=True,
                 save_format='tf',
             ),
-            callbacks.TensorBoard(log_dir=str(temporary_log_dir), histogram_freq=0, profile_batch = '500, 510'),
+            TBCallback(log_dir=str(temporary_log_dir), histogram_freq=1, profile_batch = '500, 510'),
             callbacks.EarlyStopping(monitor="val_loss", patience=4),
             callbacks.CSVLogger(str(save_dir / "training.csv")),
         ],
