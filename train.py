@@ -98,9 +98,14 @@ def train(
     temporary_log_dir = pathlib.Path(tempfile.mkdtemp())
     print("Temporary log directory: {}".format(temporary_log_dir))
 
+    process = psutil.Process(os.getpid())
+    print(f"Memory usage before training start: {process.memory_info().rss}")
+
     X_train, y_train = train_data
     X_val, y_val = val_data
     X_test, y_test = test_data
+
+    print(f"Memory usage before taining start: {process.memory_info().rss}")
 
     model.fit(
         X_train,
