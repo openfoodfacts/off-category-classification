@@ -7,6 +7,8 @@ import shutil
 import tempfile
 from typing import List
 
+import os, psutil # Remove this?
+
 import dacite
 from robotoff.taxonomy import Taxonomy
 import tensorflow as tf
@@ -157,10 +159,20 @@ def main():
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    process = psutil.Process(os.getpid())
+
+    print(f"Memory usage before start: {process.memory_info().rss}")
+
     category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
 
+    print(f"Memory usage after Taxonomy load: {process.memory_info().rss}")
+
     dfs = create_dataframes()
+    print(f"Memory usage on created dataframes: {process.memory_info().rss}")
     train_df, test_df, val_df = dfs["train"], dfs["test"], dfs["val"]
+
+    print(f"Memory usage after 3-way split: {process.memory_info().rss}")
+
 
     categories_count = count_categories(train_df)
 
@@ -206,6 +218,7 @@ def main():
         copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
         save_category_vocabulary(category_to_id, save_dir)
 
+        print(f"Memory usage before training data generation: {process.memory_info().rss}")
         print("Processing training data")
         X_train, y_train = generate_data_partial(train_df)
         print("Processing validation data")
@@ -213,6 +226,7 @@ def main():
         print("Processing test data")
         X_test, y_test = generate_data_partial(test_df)
 
+        print(f"Memory usage after training data generation: {process.memory_info().rss}")
         train(
             (X_train, y_train),
             (X_val, y_val),
