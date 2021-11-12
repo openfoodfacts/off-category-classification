@@ -5,7 +5,7 @@ import json
 import pathlib
 import shutil
 import tempfile
-from typing import List
+from typing import List, Dict
 
 import os, psutil # Remove this?
 
@@ -20,7 +20,7 @@ import pandas as pd
 from tensorflow.keras import callbacks
 import pandas as pd
 
-from category_classification.data_utils import create_dataframes, generate_data_from_df
+from category_classification.data_utils import convert_to_tf_dataset, load_dataframe
 from category_classification.models import build_model, to_serving_model, Config
 import settings
 from utils import update_dict_dot
@@ -28,15 +28,9 @@ from utils.io import (
     copy_category_taxonomy,
     save_category_vocabulary,
     save_config,
-    save_ingredient_vocabulary,
     save_json,
-    save_product_name_vocabulary,
 )
 from utils.metrics import evaluation_report
-from utils.preprocess import (
-    count_categories,
-)
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -85,34 +79,27 @@ class TBCallback(callbacks.TensorBoard):
                 self._train_writer.flush()
 
 def train(
-    train_data,
-    val_data,
-    test_data,
+    train_df: pd.DataFrame,
     model: keras.Model,
     save_dir: pathlib.Path,
     config: Config,
-    category_taxonomy: Taxonomy,
-    category_names: List[str],
+    category_vocab: List[str],
 ):
     print("Starting training...")
     temporary_log_dir = pathlib.Path(tempfile.mkdtemp())
     print("Temporary log directory: {}".format(temporary_log_dir))
 
     process = psutil.Process(os.getpid())
-    print(f"Memory usage before training start: {process.memory_info().rss}")
 
-    X_train, y_train = train_data
-    X_val, y_val = val_data
-    X_test, y_test = test_data
+    train = convert_to_tf_dataset(train_df, category_vocab)
+    val = convert_to_tf_dataset(load_dataframe("val"), category_vocab)
 
-    print(f"Memory usage before taining start: {process.memory_info().rss}")
+    print(f"Memory usage on after dataset formatting: {process.memory_info().rss}")
 
-    model.fit(
-        X_train,
-        y_train,
+    model.fit(train,
         batch_size=config.train_config.batch_size,
         epochs=config.train_config.epochs,
-        validation_data=(X_val, y_val),
+        validation_data=val,
         callbacks=[
             callbacks.TerminateOnNaN(),
             callbacks.ModelCheckpoint(
@@ -135,10 +122,13 @@ def train(
     print("Saving the base and the serving model {}".format(save_dir))
     model.save(str(save_dir / "base/saved_model"))
 
-    to_serving_model(model, category_names).save(str(save_dir / "serving/saved_model"))
+    to_serving_model(model, category_vocab).save(str(save_dir / "serving/saved_model"))
+
+    category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
+
 
     print("Evaluating on validation dataset")
-    y_pred_val = model.predict(X_val)
+    y_pred_val = model.predict(X_val) # fix this later.
     report, clf_report = evaluation_report(
         y_val, y_pred_val, taxonomy=category_taxonomy, category_names=category_names
     )
@@ -165,57 +155,17 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     process = psutil.Process(os.getpid())
+    print(f"Memory usage on start: {process.memory_info().rss}")
 
-    print(f"Memory usage before start: {process.memory_info().rss}")
+    train_df = load_dataframe("train")
 
-    category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
+    print(f"Memory usage on after training dataframe loaded: {process.memory_info().rss}")
 
-    print(f"Memory usage after Taxonomy load: {process.memory_info().rss}")
+    category_lookup = tf.keras.layers.StringLookup(max_tokens=3969, output_mode="multi_hot", num_oov_indices=0)
+    category_lookup.adapt(tf.ragged.constant(train_df.categories_tags))
 
-    dfs = create_dataframes()
-    print(f"Memory usage on created dataframes: {process.memory_info().rss}")
-    train_df, test_df, val_df = dfs["train"], dfs["test"], dfs["val"]
-
-    print(f"Memory usage after 3-way split: {process.memory_info().rss}")
-
-
-    categories_count = count_categories(train_df)
-
-    selected_categories = set(
-        (
-            cat
-            for cat, count in categories_count.items()
-            if count >= config.category_min_count
-        )
-    )
-
-    print("{} categories selected".format(len(selected_categories)))
-
-    sorted_categories = [
-        x for x in sorted(category_taxonomy.keys()) if x in selected_categories
-    ]
-
-    category_to_id = {name: idx for idx, name in enumerate(sorted_categories)}
-
-    model_config.output_dim = len(category_to_id)
-
-    generate_data_partial = functools.partial(
-        generate_data_from_df,
-        category_to_id=category_to_id,
-        categories=sorted_categories,
-        nutriment_input=config.model_config.nutriment_input,
-    )
-
-    print(f"Memory usage before training data generation: {process.memory_info().rss}")
-    print("Processing training data")
-    X_train, y_train = generate_data_partial(train_df)
-    print("Processing validation data")
-    X_val, y_val = generate_data_partial(val_df)
-    print("Processing test data")
-    X_test, y_test = generate_data_partial(test_df)
-    print(f"Memory usage after training data generation: {process.memory_info().rss}")
-    del dfs
-    print(f"Memory usage after deleting the original DataFrame: {process.memory_info().rss}")
+    category_vocab = category_lookup.get_vocabulary()
+    model_config.output_dim = len(category_vocab)
 
     replicates = args.repeat
     if replicates == 1:
@@ -232,17 +182,15 @@ def main():
 
         save_config(config, save_dir)
         copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
-        save_category_vocabulary(category_to_id, save_dir)
+        save_category_vocabulary(category_vocab, save_dir)
 
+        print(f"Memory usage on training start: {process.memory_info().rss}")
         train(
-            (X_train, y_train),
-            (X_val, y_val),
-            (X_test, y_test),
+            train_df,
             model,
             save_dir,
             config,
-            category_taxonomy,
-            sorted_categories,
+            category_vocab,
         )
 
         config.train_config.end_datetime = str(datetime.datetime.utcnow())

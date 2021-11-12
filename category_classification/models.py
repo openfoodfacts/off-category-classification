@@ -120,11 +120,6 @@ def build_model(config: ModelConfig, train_data: pd.DataFrame) -> keras.Model:
     inputs = [ingredient_input, product_name_input]
     concat_input = [ingredient_layer, product_name_lstm]
 
-    if config.nutriment_input:
-        nutriment_input = layers.Input(shape=len(NUTRIMENTS))
-        inputs.append(nutriment_input)
-        concat_input.append(nutriment_input)
-
     concat = layers.Concatenate()(concat_input)
     concat = layers.Dropout(config.hidden_dropout)(concat)
     hidden = layers.Dense(config.hidden_dim)(concat)

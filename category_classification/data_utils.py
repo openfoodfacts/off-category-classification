@@ -1,7 +1,7 @@
 from collections import defaultdict
 import dataclasses
 import pathlib
-from typing import Any, Callable, Dict, Iterable, Optional, List
+from typing import Any, Callable, Dict, Iterable, Optional, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -15,86 +15,33 @@ from sklearn.preprocessing import MultiLabelBinarizer
 from category_classification.models import TextPreprocessingConfig
 import settings
 from utils.constant import UNK_TOKEN
-from utils.preprocess import (
-    generate_y
-)
 from .constants import NUTRIMENTS, NUTRIMENTS_TO_IDX
 
 
-def create_dataframes() -> Dict[str, pd.DataFrame]:
-    dfs = {}
-    for split in ("train", "test", "val"):
-        file_name = "category_xx.{}.jsonl.gz".format(split)
-        full_path = settings.DATA_DIR / file_name
-        dfs[split] = pd.DataFrame(iter_product(full_path))
-    return dfs
+def _generate_y(categories_tags: Iterable[Iterable[str]], category_vocab: List[str]):
+    category_to_ind = {name: idx for idx, name in enumerate(category_vocab)}
+    category_count = len(category_to_ind)
+    cat_binarizer = MultiLabelBinarizer(classes=list(range(category_count)))
+    category_int = [
+        [category_to_ind[cat] for cat in product_categories if cat in category_to_ind]
+        for product_categories in categories_tags
+    ]
+    return cat_binarizer.fit_transform(category_int)
+
+# Load the dataset => build the model using this dataset.
+
+def load_dataframe(type: str) -> pd.DataFrame:
+    full_path = settings.DATA_DIR / f"category_xx.{type}.jsonl.gz"
+    return pd.DataFrame(_iter_product(full_path))
+
+def convert_to_tf_dataset(df: pd.DataFrame, category_vocab: List[str]) -> tf.data.Dataset:
+    return tf.data.Dataset.from_tensors(
+        ((tf.ragged.constant(df.ingredient_tags, dtype=tf.string), df.product_name), _generate_y(df["categories_tags"], category_vocab)))
 
 
-def iter_product(data_path: pathlib.Path):
+def _iter_product(data_path: pathlib.Path):
     for product in gzip_jsonl_iter(data_path): 
         # Filter out fields we don't need.
-        filtered_product = {key: product[key] for key in {"product_name", "categories_tags","ingredient_tags", "nutriments"}}
+        filtered_product = {key: product[key] for key in {"product_name", "categories_tags","ingredient_tags"}}        
 
-        # Filter for only supported nutriments.
-        if "nutriments" in filtered_product:
-            nutriments = filtered_product["nutriments"] or {}
-            for key in list(nutriments.keys()):
-                if key not in NUTRIMENTS:
-                    nutriments.pop(key)
         yield filtered_product
-
-def generate_data_from_df(
-    df: pd.DataFrame,
-    category_to_id: Dict,
-    categories: List[str],
-    nutriment_input: bool,
-):
-
-    inputs = [tf.ragged.constant(df.ingredient_tags, dtype=tf.string), tf.constant(df.product_name, dtype=tf.string)]
-    if nutriment_input:
-        nutriments_matrix = process_nutriments(df.nutriments)
-        inputs.append(nutriments_matrix)
-
-
-    # categoriser = preprocessing.StringLookup(vocabulary=categories)
-
-    # print(f"Vocabulary is {categoriser.get_vocabulary()}")
-
-    # print(f"Category tags are {df.categories_tags}")
-    # y = categoriser(tf.constant(df.categories_tags))
-    # print(y)
-    # print("\n\n")
-    y = generate_y(df.categories_tags, category_to_id)
-    return inputs, y
-
-
-def get_nutriment_value(nutriments: Dict[str, Any], nutriment_name: str) -> float:
-    if nutriment_name in nutriments:
-        value = nutriments[nutriment_name]
-
-        if isinstance(value, str):
-            try:
-                value = float(value)
-            except ValueError:
-                return 0.0
-
-        if isinstance(value, float):
-            if value == float("nan"):
-                return 0.0
-
-            return value
-
-    return 0.0
-
-
-def process_nutriments(nutriments_iter: Iterable[Optional[Dict]]) -> np.ndarray:
-    nutriments_list = list(nutriments_iter)
-
-    array = np.zeros((len(nutriments_list), len(NUTRIMENTS)), type=np.float32)
-
-    for i, product_nutriments in enumerate(nutriments_list):
-        if product_nutriments is not None:
-            for nutriment in NUTRIMENTS:
-                array[i, NUTRIMENTS_TO_IDX[nutriment]] = get_nutriment_value(
-                    product_nutriments, nutriment
-                )
