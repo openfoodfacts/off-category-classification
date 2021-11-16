@@ -7,7 +7,7 @@ import shutil
 import tempfile
 from typing import List, Dict
 
-import os, psutil # Remove this?
+from guppy import hpy
 
 import dacite
 from robotoff.taxonomy import Taxonomy
@@ -89,12 +89,15 @@ def train(
     temporary_log_dir = pathlib.Path(tempfile.mkdtemp())
     print("Temporary log directory: {}".format(temporary_log_dir))
 
-    process = psutil.Process(os.getpid())
+    heap = hpy()
+
+    print(f"Heap before TF conversion: {heap.heap()}")
 
     train = convert_to_tf_dataset(train_df, category_vocab)
-    val = convert_to_tf_dataset(load_dataframe("val"), category_vocab)
+    print(f"Heap after TF train conversion: {heap.heap()}")
 
-    print(f"Memory usage on after dataset formatting: {process.memory_info().rss}")
+    val = convert_to_tf_dataset(load_dataframe("val"), category_vocab)
+    print(f"Heap after TF validation conversion: {heap.heap()}")
 
     model.fit(train,
         batch_size=config.train_config.batch_size,
@@ -124,26 +127,26 @@ def train(
 
     to_serving_model(model, category_vocab).save(str(save_dir / "serving/saved_model"))
 
-    category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
+    # category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
 
 
-    print("Evaluating on validation dataset")
-    y_pred_val = model.predict(X_val) # fix this later.
-    report, clf_report = evaluation_report(
-        y_val, y_pred_val, taxonomy=category_taxonomy, category_names=category_names
-    )
+    # print("Evaluating on validation dataset")
+    # y_pred_val = model.predict(X_val) # fix this later.
+    # report, clf_report = evaluation_report(
+    #     y_val, y_pred_val, taxonomy=category_taxonomy, category_names=category_names
+    # )
 
-    save_json(report, save_dir / "metrics_val.json")
-    save_json(clf_report, save_dir / "classification_report_val.json")
+    # save_json(report, save_dir / "metrics_val.json")
+    # save_json(clf_report, save_dir / "classification_report_val.json")
 
-    print("Evaluating on test dataset")
-    y_pred_test = model.predict(X_test)
-    report, clf_report = evaluation_report(
-        y_test, y_pred_test, taxonomy=category_taxonomy, category_names=category_names
-    )
+    # print("Evaluating on test dataset")
+    # y_pred_test = model.predict(X_test)
+    # report, clf_report = evaluation_report(
+    #     y_test, y_pred_test, taxonomy=category_taxonomy, category_names=category_names
+    # )
 
-    save_json(report, save_dir / "metrics_test.json")
-    save_json(clf_report, save_dir / "classification_report_test.json")
+    # save_json(report, save_dir / "metrics_test.json")
+    # save_json(clf_report, save_dir / "classification_report_test.json")
 
 
 def main():
@@ -151,15 +154,15 @@ def main():
     config: Config = get_config(args)
     model_config = config.model_config
 
+    heap = hpy()
+    print(f"Initial heap size:\n {heap.heap()}")
+
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    process = psutil.Process(os.getpid())
-    print(f"Memory usage on start: {process.memory_info().rss}")
-
     train_df = load_dataframe("train")
 
-    print(f"Memory usage on after training dataframe loaded: {process.memory_info().rss}")
+    print(f"After train DF load:\n {heap.heap()}")
 
     category_lookup = tf.keras.layers.StringLookup(max_tokens=3969, output_mode="multi_hot", num_oov_indices=0)
     category_lookup.adapt(tf.ragged.constant(train_df.categories_tags))
@@ -175,6 +178,7 @@ def main():
 
     for i, save_dir in enumerate(save_dirs):
         model = create_model(config, train_df)
+        print(f"After model creation load:\n {heap.heap()}")
 
         save_dir.mkdir(exist_ok=True)
         config.train_config.start_datetime = str(datetime.datetime.utcnow())
@@ -184,7 +188,6 @@ def main():
         copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
         save_category_vocabulary(category_vocab, save_dir)
 
-        print(f"Memory usage on training start: {process.memory_info().rss}")
         train(
             train_df,
             model,
