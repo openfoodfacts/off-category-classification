@@ -7,8 +7,6 @@ import shutil
 import tempfile
 from typing import List, Dict
 
-from guppy import hpy
-
 import dacite
 from robotoff.taxonomy import Taxonomy
 import tensorflow as tf
@@ -20,8 +18,8 @@ import pandas as pd
 from tensorflow.keras import callbacks
 import pandas as pd
 
-from category_classification.data_utils import convert_to_tf_dataset, load_dataframe
-from category_classification.models import build_model, to_serving_model, Config
+from category_classification.data_utils import create_tf_dataset, load_dataframe, TFTransformer
+from category_classification.models import build_model, to_serving_model, Config, construct_preprocessing, KerasPreprocessing
 import settings
 from utils import update_dict_dot
 from utils.io import (
@@ -42,8 +40,8 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_model(config: Config, train_data: pd.DataFrame) -> keras.Model:
-    model = build_model(config.model_config, train_data)
+def create_model(config: Config, preprocess: KerasPreprocessing) -> keras.Model:
+    model = build_model(config.model_config, preprocess)
     loss_fn = keras.losses.BinaryCrossentropy(
         label_smoothing=config.train_config.label_smoothing
     )
@@ -53,6 +51,7 @@ def create_model(config: Config, train_data: pd.DataFrame) -> keras.Model:
         loss=loss_fn,
         metrics=["binary_accuracy", "Precision", "Recall"],
     )
+    print(f"{model.summary()}")
     return model
 
 
@@ -79,7 +78,6 @@ class TBCallback(callbacks.TensorBoard):
                 self._train_writer.flush()
 
 def train(
-    train_df: pd.DataFrame,
     model: keras.Model,
     save_dir: pathlib.Path,
     config: Config,
@@ -89,18 +87,12 @@ def train(
     temporary_log_dir = pathlib.Path(tempfile.mkdtemp())
     print("Temporary log directory: {}".format(temporary_log_dir))
 
-    heap = hpy()
+    tf_transformer = TFTransformer(category_vocab)
 
-    print(f"Heap before TF conversion: {heap.heap()}")
-
-    train = convert_to_tf_dataset(train_df, category_vocab)
-    print(f"Heap after TF train conversion: {heap.heap()}")
-
-    val = convert_to_tf_dataset(load_dataframe("val"), category_vocab)
-    print(f"Heap after TF validation conversion: {heap.heap()}")
+    train = create_tf_dataset("train", config.train_config.batch_size, tf_transformer)
+    val = create_tf_dataset("val", config.train_config.batch_size, tf_transformer)
 
     model.fit(train,
-        batch_size=config.train_config.batch_size,
         epochs=config.train_config.epochs,
         validation_data=val,
         callbacks=[
@@ -148,27 +140,15 @@ def train(
     # save_json(report, save_dir / "metrics_test.json")
     # save_json(clf_report, save_dir / "classification_report_test.json")
 
-
 def main():
     args = parse_args()
     config: Config = get_config(args)
     model_config = config.model_config
 
-    heap = hpy()
-    print(f"Initial heap size:\n {heap.heap()}")
-
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    train_df = load_dataframe("train")
-
-    print(f"After train DF load:\n {heap.heap()}")
-
-    category_lookup = tf.keras.layers.StringLookup(max_tokens=3969, output_mode="multi_hot", num_oov_indices=0)
-    category_lookup.adapt(tf.ragged.constant(train_df.categories_tags))
-
-    category_vocab = category_lookup.get_vocabulary()
-    model_config.output_dim = len(category_vocab)
+    keras_preprocess = construct_preprocessing(3969, 93000, config.model_config.product_name_max_length, 335, load_dataframe("train"))
 
     replicates = args.repeat
     if replicates == 1:
@@ -177,29 +157,27 @@ def main():
         save_dirs = [output_dir / str(i) for i in range(replicates)]
 
     for i, save_dir in enumerate(save_dirs):
-        model = create_model(config, train_df)
-        print(f"After model creation load:\n {heap.heap()}")
+        model = create_model(config, keras_preprocess)
 
         save_dir.mkdir(exist_ok=True)
         config.train_config.start_datetime = str(datetime.datetime.utcnow())
-        print("Starting training repeat {}".format(i))
+        print(f"Starting training repeat {i}")
 
         save_config(config, save_dir)
         copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
-        save_category_vocabulary(category_vocab, save_dir)
+        save_category_vocabulary(keras_preprocess.category_vocab, save_dir)
 
         train(
-            train_df,
             model,
             save_dir,
             config,
-            category_vocab,
+            keras_preprocess.category_vocab,
         )
 
-        config.train_config.end_datetime = str(datetime.datetime.utcnow())
-        save_config(config, save_dir)
-        config.train_config.start_datetime = None
-        config.train_config.end_datetime = None
+        # config.train_config.end_datetime = str(datetime.datetime.utcnow())
+        # save_config(config, save_dir)
+        # config.train_config.start_datetime = None
+        # config.train_config.end_datetime = None
 
 
 if __name__ == "__main__":

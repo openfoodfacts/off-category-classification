@@ -7,41 +7,58 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from robotoff.utils import gzip_jsonl_iter
-from sklearn.preprocessing import MultiLabelBinarizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.layers.experimental import preprocessing
-from sklearn.preprocessing import MultiLabelBinarizer
 
-from category_classification.models import TextPreprocessingConfig
 import settings
-from utils.constant import UNK_TOKEN
+import functools
 from .constants import NUTRIMENTS, NUTRIMENTS_TO_IDX
 
+def _data_path(type: str) -> pathlib.Path:
+    return settings.DATA_DIR / f"category_xx.{type}.jsonl.gz"
 
-def _generate_y(categories_tags: Iterable[Iterable[str]], category_vocab: List[str]):
-    category_to_ind = {name: idx for idx, name in enumerate(category_vocab)}
-    category_count = len(category_to_ind)
-    cat_binarizer = MultiLabelBinarizer(classes=list(range(category_count)))
-    category_int = [
-        [category_to_ind[cat] for cat in product_categories if cat in category_to_ind]
-        for product_categories in categories_tags
-    ]
-    return cat_binarizer.fit_transform(category_int)
-
-# Load the dataset => build the model using this dataset.
 
 def load_dataframe(type: str) -> pd.DataFrame:
-    full_path = settings.DATA_DIR / f"category_xx.{type}.jsonl.gz"
-    return pd.DataFrame(_iter_product(full_path))
+    return pd.DataFrame(_iter_product(_data_path(type)))
 
-def convert_to_tf_dataset(df: pd.DataFrame, category_vocab: List[str]) -> tf.data.Dataset:
-    return tf.data.Dataset.from_tensors(
-        ((tf.ragged.constant(df.ingredient_tags, dtype=tf.string), df.product_name), _generate_y(df["categories_tags"], category_vocab)))
+class TFTransformer():
+    def __init__(self, category_vocab: List[str]):
+        self.category_to_ind = {name: idx for idx, name in enumerate(category_vocab)}
+        self.category_size = len(category_vocab)
+        # TODO(kulizhsy): consider using SparseTensors?
+        self.encoder = tf.keras.layers.CategoryEncoding(num_tokens=self.category_size, output_mode="multi_hot")
 
+    def transform(self, product: Dict):
+        category_int = [self.category_to_ind[cat] for cat in product["categories_tags"] if cat in self.category_to_ind]
+        # Try to return ragged tensors here?
+        return (product["known_ingredient_tags"], tf.constant(product["product_name"], dtype=tf.string)), self.encoder(category_int)
 
-def _iter_product(data_path: pathlib.Path):
+def create_tf_dataset(type: str, batch_size: int, transformer: TFTransformer) -> tf.data.Dataset:
+    generator = functools.partial(
+        _iter_product,
+        data_path = _data_path(type),
+        tf_transformer= transformer.transform)
+    return tf.data.Dataset.from_generator(generator,
+        output_signature=(
+            (tf.TensorSpec(shape=(None,), dtype=tf.string),
+            tf.TensorSpec(shape=(), dtype=tf.string)),
+            tf.TensorSpec(shape=(transformer.category_size,), dtype=tf.int32)
+            )
+        ).padded_batch(batch_size)
+
+counter = 0
+
+def _iter_product(data_path: pathlib.Path, tf_transformer: Callable = None):
+    global counter
     for product in gzip_jsonl_iter(data_path): 
-        # Filter out fields we don't need.
-        filtered_product = {key: product[key] for key in {"product_name", "categories_tags","ingredient_tags"}}        
-
-        yield filtered_product
+        if counter == 3000:
+            counter = 0
+            break
+            counter = counter + 1
+        if tf_transformer:
+            tf = tf_transformer(product)
+            yield tf
+        else:
+            # Filter out fields we don't need.
+            filtered_product = {key: product[key] for key in {"product_name", "categories_tags","known_ingredient_tags"}}       
+            yield filtered_product

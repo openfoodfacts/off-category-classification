@@ -1,10 +1,4 @@
 {
-    "product_name_preprocessing_config": {
-        "lower": true,
-        "strip_accent": false,
-        "remove_punct": false,
-        "remove_digit": false
-    },
     "train_config": {
         "batch_size": 128,
         "epochs": 50,
@@ -20,7 +14,6 @@
         "hidden_dim": 64,
         "hidden_dropout": 0.2
     },
-    "lang": "xx",
     "product_name_min_count": 0,
     "category_min_count": 1,
     "ingredient_min_count": 3
