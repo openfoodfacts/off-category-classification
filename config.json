@@ -11,10 +11,11 @@
         "product_name_embedding_size": 64,
         "product_name_lstm_units": 64,
         "product_name_max_length": 30,
+        "product_name_max_tokens": 93000,
         "hidden_dim": 64,
-        "hidden_dropout": 0.2
-    },
-    "product_name_min_count": 0,
-    "category_min_count": 1,
-    "ingredient_min_count": 3
+        "hidden_dropout": 0.2,
+
+        "category_min_count": 10,
+        "ingredient_min_count": 3
+    }
 }

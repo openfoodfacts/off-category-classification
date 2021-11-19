@@ -7,15 +7,7 @@ from typing import Dict
 import dacite
 
 import settings
-from category_classification.models import Config
-
-
-def save_product_name_vocabulary(token_to_int: Dict[str, int], model_dir: pathlib.Path):
-    return save_json(token_to_int, model_dir / settings.PRODUCT_NAME_VOC_NAME)
-
-
-def load_product_name_vocabulary(model_dir: pathlib.Path):
-    return load_json(model_dir / settings.PRODUCT_NAME_VOC_NAME)
+from category_classification.config import Config
 
 
 def save_category_vocabulary(category_vocab: Dict[str, int], model_dir: pathlib.Path):

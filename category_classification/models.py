@@ -1,54 +1,24 @@
 import contextlib
 import dataclasses
 import datetime
-from typing import List, Optional, Union
+from collections import defaultdict
+from typing import List, Optional, Dict
 
+from category_classification.config import ModelConfig
+
+import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-import pandas as pd
 
-from .constants import NUTRIMENTS
-
-
-@dataclasses.dataclass
-class TrainConfig:
-    batch_size: int
-    epochs: int
-    lr: float
-    label_smoothing: float = 0
-    start_datetime: Union[datetime.datetime, None, str] = None
-    end_datetime: Union[datetime.datetime, None, str] = None
-
-
-@dataclasses.dataclass
-class ModelConfig:
-    product_name_lstm_recurrent_dropout: float
-    product_name_lstm_dropout: float
-    product_name_embedding_size: int
-    product_name_lstm_units: int
-    product_name_max_length: int
-    hidden_dim: int
-    hidden_dropout: float
-    product_name_voc_size: Optional[int] = None
-    ingredient_voc_size: Optional[int] = None
-    nutriment_input: bool = False
-
-
-@dataclasses.dataclass
-class Config:
-    train_config: TrainConfig
-    model_config: ModelConfig
-    product_name_min_count: int
-    category_min_count: int = 0
-    ingredient_min_count: int = 0
 
 @tf.keras.utils.register_keras_serializable()
 class OutputMapperLayer(layers.Layer):
-    '''
-        The OutputMapperLayer converts the label indices produced by the model to
-        the taxonomy category ids and limits them to top N labels.
-    '''
+    """
+    The OutputMapperLayer converts the label indices produced by the model to
+    the taxonomy category ids and limits them to top N labels.
+    """
+
     def __init__(self, labels: List[str], top_n: int, **kwargs):
         self.labels = labels
         self.top_n = top_n
@@ -74,30 +44,70 @@ class OutputMapperLayer(layers.Layer):
         return [top_shape, top_shape]
 
     def get_config(self):
-        config={'labels': self.labels, 'top_n': self.top_n}
+        config = {"labels": self.labels, "top_n": self.top_n}
         base_config = super(OutputMapperLayer, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
 
 @dataclasses.dataclass
 class KerasPreprocessing:
+    """KerasPreprocessing stores the preprocessing layers and related metadata extracted from the
+    training dataset.
+    """
     ingredient_preprocessing: keras.layers.Layer
     product_name_preprocessing: keras.layers.Layer
     category_vocab: List[str]
 
 
-def construct_preprocessing(max_categories: int, max_product_name_tokens: int, max_length: int, max_ingredients: int, train_df: pd.DataFrame) -> KerasPreprocessing:
-    category_lookup = tf.keras.layers.StringLookup(max_tokens=max_categories, output_mode="multi_hot", num_oov_indices=0)
-    category_lookup.adapt(tf.ragged.constant(train_df.categories_tags))
+def _count_occurrances(df_col: pd.Series) -> Dict[str, int]:
+    counts = defaultdict(int)
 
-    product_name_preprocessing = tf.keras.layers.TextVectorization(split='whitespace', max_tokens=max_product_name_tokens, output_sequence_length=max_length)
+    for vals in df_col:
+        for val in vals:
+            counts[val] += 1
+
+    return counts
+
+
+def _construct_preprocessing_vocab(df_col: pd.Series, min_count: int) -> List[str]:
+    counts = _count_occurrances(df_col)
+
+    return [item for item, count in counts.items() if count >= min_count]
+
+
+def construct_preprocessing(
+    category_min_count: int,
+    ingredients_min_count: int,
+    max_product_name_tokens: int,
+    max_product_name_length: int,
+    train_df: pd.DataFrame,
+) -> KerasPreprocessing:
+    cat_vocab = _construct_preprocessing_vocab(
+        train_df["categories_tags"], category_min_count
+    )
+    category_lookup = tf.keras.layers.StringLookup(
+        vocabulary=cat_vocab, output_mode="multi_hot", num_oov_indices=0
+    )
+
+    product_name_preprocessing = tf.keras.layers.TextVectorization(
+        split="whitespace",
+        max_tokens=max_product_name_tokens,
+        output_sequence_length=max_product_name_length,
+    )
     product_name_preprocessing.adapt(train_df.product_name)
 
-    ingredient_preprocessing = tf.keras.layers.StringLookup(max_tokens=max_ingredients, output_mode="multi_hot")
-    ingredient_preprocessing.adapt(tf.ragged.constant(train_df.known_ingredient_tags))
+    ingredient_vocab = _construct_preprocessing_vocab(
+        train_df["known_ingredient_tags"], ingredients_min_count
+    )
+    ingredient_preprocessing = tf.keras.layers.StringLookup(
+        vocabulary=ingredient_vocab, output_mode="multi_hot"
+    )
 
-    return KerasPreprocessing(ingredient_preprocessing, product_name_preprocessing, category_lookup.get_vocabulary())
-
+    return KerasPreprocessing(
+        ingredient_preprocessing,
+        product_name_preprocessing,
+        category_lookup.get_vocabulary(),
+    )
 
 
 def build_model(config: ModelConfig, preprocessing: KerasPreprocessing) -> keras.Model:
@@ -107,7 +117,7 @@ def build_model(config: ModelConfig, preprocessing: KerasPreprocessing) -> keras
     product_name_layer = preprocessing.product_name_preprocessing(product_name_input)
 
     product_name_embedding = layers.Embedding(
-        input_dim=93000,
+        input_dim=preprocessing.product_name_preprocessing.vocabulary_size(),
         output_dim=config.product_name_embedding_size,
         mask_zero=False,
     )(product_name_layer)
@@ -130,7 +140,9 @@ def build_model(config: ModelConfig, preprocessing: KerasPreprocessing) -> keras
     hidden = layers.Dense(config.hidden_dim)(concat)
     hidden = layers.Dropout(config.hidden_dropout)(hidden)
     hidden = layers.Activation("relu")(hidden)
-    output = layers.Dense(len(preprocessing.category_vocab), activation="sigmoid")(hidden)
+    output = layers.Dense(len(preprocessing.category_vocab), activation="sigmoid")(
+        hidden
+    )
     return keras.Model(inputs=inputs, outputs=[output])
 
 

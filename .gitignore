@@ -4,5 +4,3 @@ __pycache__
 .DS_Store
 data
 venv
-weights
-category_classification/error_analysis.html

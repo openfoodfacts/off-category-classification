@@ -1,40 +1,14 @@
 import operator
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 import numpy as np
 from robotoff.taxonomy import Taxonomy
-
 from sklearn.metrics import (
+    classification_report,
+    f1_score,
     precision_score,
     recall_score,
-    f1_score,
-    classification_report,
 )
-
-
-def hierarchical_precision_recall_f1(y_true: np.ndarray, y_pred: np.ndarray):
-    ix = np.where((y_true != 0) & (y_pred != 0))
-
-    true_positives = len(ix[0])
-    all_results = np.count_nonzero(y_pred)
-    all_positives = np.count_nonzero(y_true)
-
-    h_precision = true_positives / all_results
-    h_recall = true_positives / all_positives
-    beta = 1
-    h_f_1 = (
-        (1.0 + beta ** 2.0)
-        * h_precision
-        * h_recall
-        / (beta ** 2.0 * h_precision + h_recall)
-    )
-
-    return {
-        "h_precision": h_precision,
-        "h_recall": h_recall,
-        "h_f1": h_f_1,
-    }
-
 
 def fill_ancestors(
     y: np.ndarray,
