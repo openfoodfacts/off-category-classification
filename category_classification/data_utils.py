@@ -62,7 +62,6 @@ def create_tf_dataset(
 
 
 def _iter_product(data_path: pathlib.Path, tf_transformer: Callable = None):
-    global counter
     for product in gzip_jsonl_iter(data_path):
         if tf_transformer:
             tf = tf_transformer(product)
