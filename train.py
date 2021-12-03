@@ -5,35 +5,40 @@ import json
 import pathlib
 import shutil
 import tempfile
-from typing import List
+from typing import Dict, List
 
 import dacite
-from robotoff.taxonomy import Taxonomy
+import pandas as pd
 import tensorflow as tf
-from tensorflow.python.ops import summary_ops_v2
+from robotoff.taxonomy import Taxonomy
 from tensorflow import keras
 from tensorflow.data import Dataset
-import pandas as pd
-
 from tensorflow.keras import callbacks
-import pandas as pd
+from tensorflow.python.ops import summary_ops_v2
 
-from category_classification.data_utils import create_dataframes, generate_data_from_df
-from category_classification.models import build_model, to_serving_model, Config
 import settings
+from category_classification.data_utils import (
+    TFTransformer,
+    create_tf_dataset,
+    load_dataframe,
+)
+from category_classification.models import (
+    KerasPreprocessing,
+    build_model,
+    construct_preprocessing,
+    to_serving_model,
+)
+
+from category_classification.config import Config
+
 from utils import update_dict_dot
 from utils.io import (
     copy_category_taxonomy,
     save_category_vocabulary,
     save_config,
-    save_ingredient_vocabulary,
     save_json,
-    save_product_name_vocabulary,
 )
 from utils.metrics import evaluation_report
-from utils.preprocess import (
-    count_categories,
-)
 
 
 def parse_args():
@@ -46,8 +51,8 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_model(config: Config, train_data: pd.DataFrame) -> keras.Model:
-    model = build_model(config.model_config, train_data)
+def create_model(config: Config, preprocess: KerasPreprocessing) -> keras.Model:
+    model = build_model(config.model_config, preprocess)
     loss_fn = keras.losses.BinaryCrossentropy(
         label_smoothing=config.train_config.label_smoothing
     )
@@ -67,45 +72,42 @@ def get_config(args) -> Config:
     print("Full configuration:\n{}".format(json.dumps(config_dict, indent=4)))
     return dacite.from_dict(Config, config_dict)
 
+
 class TBCallback(callbacks.TensorBoard):
-    ''' Get around a bug in using the StringLookup layers - https://github.com/tensorflow/tensorboard/issues/4530#issuecomment-783318292
-    '''
+    """Get around a bug where you cannot use the TensorBoard callback with the StringLookup layers
+    - https://github.com/tensorflow/tensorboard/issues/4530#issuecomment-783318292"""
+
     def _log_weights(self, epoch):
         with self._train_writer.as_default():
             with summary_ops_v2.always_record_summaries():
                 for layer in self.model.layers:
                     for weight in layer.weights:
                         if hasattr(weight, "name"):
-                            weight_name = weight.name.replace(':', '_')
+                            weight_name = weight.name.replace(":", "_")
                             summary_ops_v2.histogram(weight_name, weight, step=epoch)
                             if self.write_images:
                                 self._log_weight_as_image(weight, weight_name, epoch)
                 self._train_writer.flush()
 
+
 def train(
-    train_data,
-    val_data,
-    test_data,
     model: keras.Model,
     save_dir: pathlib.Path,
     config: Config,
-    category_taxonomy: Taxonomy,
-    category_names: List[str],
+    category_vocab: List[str],
 ):
     print("Starting training...")
     temporary_log_dir = pathlib.Path(tempfile.mkdtemp())
     print("Temporary log directory: {}".format(temporary_log_dir))
 
-    X_train, y_train = train_data
-    X_val, y_val = val_data
-    X_test, y_test = test_data
+    tf_transformer = TFTransformer(category_vocab)
 
-    model.fit(
-        X_train,
-        y_train,
-        batch_size=config.train_config.batch_size,
-        epochs=config.train_config.epochs,
-        validation_data=(X_val, y_val),
+    train = create_tf_dataset("train", config.train_config.batch_size, tf_transformer)
+    val = create_tf_dataset("val", config.train_config.batch_size, tf_transformer)
+
+    model.fit(train,
+        epochs= config.train_config.epochs,
+        validation_data=val,
         callbacks=[
             callbacks.TerminateOnNaN(),
             callbacks.ModelCheckpoint(
@@ -114,7 +116,7 @@ def train(
                 save_best_only=True,
                 save_format='tf',
             ),
-            TBCallback(log_dir=str(temporary_log_dir), histogram_freq=1, profile_batch = '500, 510'),
+            TBCallback(log_dir=str(temporary_log_dir), histogram_freq=1),
             callbacks.EarlyStopping(monitor="val_loss", patience=4),
             callbacks.CSVLogger(str(save_dir / "training.csv")),
         ],
@@ -127,22 +129,24 @@ def train(
 
     print("Saving the base and the serving model {}".format(save_dir))
     model.save(str(save_dir / "base/saved_model"))
+    to_serving_model(model, category_vocab).save(str(save_dir / "serving/saved_model"))
 
-    to_serving_model(model, category_names).save(str(save_dir / "serving/saved_model"))
+    category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
 
     print("Evaluating on validation dataset")
-    y_pred_val = model.predict(X_val)
+    y_pred_val = model.predict(val.map(lambda x,y: x))
     report, clf_report = evaluation_report(
-        y_val, y_pred_val, taxonomy=category_taxonomy, category_names=category_names
+        val.map(lambda x, y: y).as_numpy(), y_pred_val, taxonomy=category_taxonomy, category_names=category_names
     )
 
     save_json(report, save_dir / "metrics_val.json")
     save_json(clf_report, save_dir / "classification_report_val.json")
 
     print("Evaluating on test dataset")
-    y_pred_test = model.predict(X_test)
+    test = create_tf_dataset("test", config.train_config.batch_size, tf_transformer)
+    y_pred_test = model.predict(test.map(lambda x,y: x))
     report, clf_report = evaluation_report(
-        y_test, y_pred_test, taxonomy=category_taxonomy, category_names=category_names
+        test.map(lambda x, y: y).as_numpy, y_pred_test, taxonomy=category_taxonomy, category_names=category_names
     )
 
     save_json(report, save_dir / "metrics_test.json")
@@ -157,37 +161,14 @@ def main():
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
-
-    dfs = create_dataframes()
-    train_df, test_df, val_df = dfs["train"], dfs["test"], dfs["val"]
-
-    categories_count = count_categories(train_df)
-
-    selected_categories = set(
-        (
-            cat
-            for cat, count in categories_count.items()
-            if count >= config.category_min_count
-        )
+    keras_preprocess = construct_preprocessing(
+        model_config.category_min_count,
+        model_config.ingredient_min_count,
+        model_config.product_name_max_tokens,
+        model_config.product_name_max_length,
+        load_dataframe("train"),
     )
-
-    print("{} categories selected".format(len(selected_categories)))
-
-    sorted_categories = [
-        x for x in sorted(category_taxonomy.keys()) if x in selected_categories
-    ]
-
-    category_to_id = {name: idx for idx, name in enumerate(sorted_categories)}
-
-    model_config.output_dim = len(category_to_id)
-
-    generate_data_partial = functools.partial(
-        generate_data_from_df,
-        category_to_id=category_to_id,
-        categories=sorted_categories,
-        nutriment_input=config.model_config.nutriment_input,
-    )
+    print("Pre-processed training data")
 
     replicates = args.repeat
     if replicates == 1:
@@ -196,32 +177,21 @@ def main():
         save_dirs = [output_dir / str(i) for i in range(replicates)]
 
     for i, save_dir in enumerate(save_dirs):
-        model = create_model(config, train_df)
+        model = create_model(config, keras_preprocess)
 
         save_dir.mkdir(exist_ok=True)
         config.train_config.start_datetime = str(datetime.datetime.utcnow())
-        print("Starting training repeat {}".format(i))
+        print(f"Starting training repeat {i}")
 
         save_config(config, save_dir)
         copy_category_taxonomy(settings.CATEGORY_TAXONOMY_PATH, save_dir)
-        save_category_vocabulary(category_to_id, save_dir)
-
-        print("Processing training data")
-        X_train, y_train = generate_data_partial(train_df)
-        print("Processing validation data")
-        X_val, y_val = generate_data_partial(val_df)
-        print("Processing test data")
-        X_test, y_test = generate_data_partial(test_df)
+        save_category_vocabulary(keras_preprocess.category_vocab, save_dir)
 
         train(
-            (X_train, y_train),
-            (X_val, y_val),
-            (X_test, y_test),
             model,
             save_dir,
             config,
-            category_taxonomy,
-            sorted_categories,
+            keras_preprocess.category_vocab,
         )
 
         config.train_config.end_datetime = str(datetime.datetime.utcnow())

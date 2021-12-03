@@ -1,5 +1,6 @@
 import argparse
 import operator
+import os
 import pathlib
 
 from robotoff.off import get_product
@@ -7,17 +8,15 @@ from robotoff.taxonomy import Taxonomy
 from tensorflow import keras
 
 import settings
+from category_classification.data_utils import generate_data
 from utils.io import (
-    load_config,
-    load_product_name_vocabulary,
     load_category_vocabulary,
+    load_config,
     load_ingredient_vocabulary,
+    load_product_name_vocabulary,
 )
 from utils.metrics import fill_ancestors
 from utils.preprocess import get_nlp
-from category_classification.data_utils import generate_data
-
-import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = ""

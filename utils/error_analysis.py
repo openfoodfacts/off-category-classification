@@ -1,14 +1,13 @@
-from typing import List, Iterable, Tuple
+from typing import Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
+from bokeh.models import ColumnDataSource, HoverTool
+from bokeh.palettes import Set2
+from bokeh.plotting import figure
 from robotoff.taxonomy import Taxonomy, TaxonomyNode
 from sklearn.decomposition import PCA
 from tensorflow import keras
-
-from bokeh.plotting import figure
-from bokeh.models import ColumnDataSource, HoverTool
-from bokeh.palettes import Set2
 
 
 def generate_analysis_model(model: keras.Model, embedding_layer_name: str):

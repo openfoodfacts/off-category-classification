@@ -1,11 +1,12 @@
+## TODO(kulizhsy): check if this still works
 import argparse
 import functools
 import operator
 import pathlib
 from typing import Dict
 
-from bokeh.plotting import show
 import pandas as pd
+from bokeh.plotting import show
 from robotoff.taxonomy import Taxonomy
 from robotoff.utils import gzip_jsonl_iter
 from tensorflow import keras
@@ -15,23 +16,28 @@ from category_classification.data_utils import generate_data_from_df
 from utils.error_analysis import (
     generate_analysis_model,
     get_deepest_categories,
-    get_interactive_embedding_plot,
     get_error_category,
+    get_interactive_embedding_plot,
 )
-
 from utils.io import (
-    load_config,
     load_category_vocabulary,
+    load_config,
     load_ingredient_vocabulary,
     load_product_name_vocabulary,
 )
 from utils.metrics import evaluation_report
 from utils.preprocess import get_nlp
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("model_path", type=pathlib.Path, default= pathlib.Path(__file__).parent / "weights/saved_model")
+    parser.add_argument(
+        "model_path",
+        type=pathlib.Path,
+        default=pathlib.Path(__file__).parent / "weights/saved_model",
+    )
     return parser.parse_args()
+
 
 def main():
     args = parse_args()
@@ -105,7 +111,6 @@ def main():
         val_df["under_pred_cat_error"],
     ) = zip(*error_categories_val)
 
-
     val_df["url"] = [
         "https://world.openfoodfacts.org/product/{}".format(c) for c in val_df.code
     ]
@@ -115,36 +120,7 @@ def main():
 
     p = get_interactive_embedding_plot(emb_val, val_df)
     show(p)
-    #
-    # report_val, clf_report_val = evaluation_report(y_val, y_pred_val,
-    #                                                taxonomy=category_taxonomy,
-    #                                                category_names=category_names)
-    #
-    #
-    # def low_perf_categories_gen(clf_report: Dict,
-    #                             min_support: int,
-    #                             max_f1_score: float):
-    #     for category, metrics in clf_report.items():
-    #         f1_score = metrics['f1-score']
-    #         support = metrics['support']
-    #
-    #         if support >= min_support:
-    #             if f1_score < max_f1_score:
-    #                 yield category
-    #
-    # # train_df = pd.DataFrame(gzip_jsonl_iter(settings.CATEGORY_FR_TRAIN_PATH))
-    # # train_df['deepest_categories'] = get_deepest_categories(category_taxonomy, train_df.categories_tags)
-    # # X_train, y_train = generate_data_partial(train_df)
-    #
-    #
-    # gen = low_perf_categories_gen(clf_report_val, min_support=10, max_f1_score=0.5)
-    # cat = next(gen)
-    # val_metrics = clf_report_val[cat]
-    # cat_id = category_to_id[cat]
-    # # train_samples_idx = y_train[:, cat_id].nonzero()[0]
-    # val_samples_idx = y_val[:, cat_id].nonzero()[0]
-    # # train_samples = train_df.iloc[train_samples_idx, :]
-    # val_samples = val_df.iloc[val_samples_idx, :]
+
 
 if __name__ == "__main__":
     main()

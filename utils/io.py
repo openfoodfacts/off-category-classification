@@ -7,19 +7,12 @@ from typing import Dict
 import dacite
 
 import settings
-from category_classification.models import Config
+from category_classification.config import Config
 
 
-def save_product_name_vocabulary(token_to_int: Dict[str, int], model_dir: pathlib.Path):
-    return save_json(token_to_int, model_dir / settings.PRODUCT_NAME_VOC_NAME)
-
-
-def load_product_name_vocabulary(model_dir: pathlib.Path):
-    return load_json(model_dir / settings.PRODUCT_NAME_VOC_NAME)
-
-
-def save_category_vocabulary(category_to_int: Dict[str, int], model_dir: pathlib.Path):
-    return save_json(category_to_int, model_dir / settings.CATEGORY_VOC_NAME)
+def save_category_vocabulary(category_vocab: Dict[str, int], model_dir: pathlib.Path):
+    category_to_ind = {name: idx for idx, name in enumerate(category_vocab)}
+    return save_json(category_to_ind, model_dir / settings.CATEGORY_VOC_NAME)
 
 
 def load_category_vocabulary(model_dir: pathlib.Path):
@@ -28,16 +21,6 @@ def load_category_vocabulary(model_dir: pathlib.Path):
 
 def copy_category_taxonomy(taxonomy_path: pathlib.Path, model_dir: pathlib.Path):
     shutil.copy(str(taxonomy_path), str(model_dir / settings.CATEGORY_TAXONOMY_NAME))
-
-
-def save_ingredient_vocabulary(
-    ingredient_to_int: Dict[str, int], model_dir: pathlib.Path
-):
-    return save_json(ingredient_to_int, model_dir / settings.INGREDIENT_VOC_NAME)
-
-
-def load_ingredient_vocabulary(model_dir: pathlib.Path):
-    return load_json(model_dir / settings.INGREDIENT_VOC_NAME)
 
 
 def save_config(model_config: Config, model_dir: pathlib.Path):

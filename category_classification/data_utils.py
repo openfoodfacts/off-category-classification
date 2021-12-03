@@ -1,100 +1,75 @@
-from collections import defaultdict
 import dataclasses
+import functools
 import pathlib
-from typing import Any, Callable, Dict, Iterable, Optional, List
+from collections import defaultdict
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from robotoff.utils import gzip_jsonl_iter
-from sklearn.preprocessing import MultiLabelBinarizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.layers.experimental import preprocessing
-from sklearn.preprocessing import MultiLabelBinarizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-from category_classification.models import TextPreprocessingConfig
 import settings
-from utils.constant import UNK_TOKEN
-from utils.preprocess import (
-    generate_y
-)
-from .constants import NUTRIMENTS, NUTRIMENTS_TO_IDX
+
+def _data_path(type: str) -> pathlib.Path:
+    return settings.DATA_DIR / f"category_xx.{type}.jsonl.gz"
 
 
-def create_dataframes() -> Dict[str, pd.DataFrame]:
-    dfs = {}
-    for split in ("train", "test", "val"):
-        file_name = "category_xx.{}.jsonl.gz".format(split)
-        full_path = settings.DATA_DIR / file_name
-        dfs[split] = pd.DataFrame(iter_product(full_path))
-    return dfs
+def load_dataframe(type: str) -> pd.DataFrame:
+    return pd.DataFrame(_iter_product(_data_path(type)))
 
 
-def iter_product(data_path: pathlib.Path):
-    for product in gzip_jsonl_iter(data_path): 
-        # Filter out fields we don't need.
-        filtered_product = {key: product[key] for key in {"product_name", "categories_tags","ingredient_tags", "nutriments"}}
+class TFTransformer:
+    def __init__(self, category_vocab: List[str]):
+        self.category_to_ind = {name: idx for idx, name in enumerate(category_vocab)}
+        self.category_size = len(category_vocab)
 
-        # Filter for only supported nutriments.
-        if "nutriments" in filtered_product:
-            nutriments = filtered_product["nutriments"] or {}
-            for key in list(nutriments.keys()):
-                if key not in NUTRIMENTS:
-                    nutriments.pop(key)
-        yield filtered_product
+        self.encoder = tf.keras.layers.CategoryEncoding(
+            num_tokens=self.category_size, output_mode="multi_hot"
+        )
 
-def generate_data_from_df(
-    df: pd.DataFrame,
-    category_to_id: Dict,
-    categories: List[str],
-    nutriment_input: bool,
-):
-
-    inputs = [tf.ragged.constant(df.ingredient_tags, dtype=tf.string), tf.constant(df.product_name, dtype=tf.string)]
-    if nutriment_input:
-        nutriments_matrix = process_nutriments(df.nutriments)
-        inputs.append(nutriments_matrix)
+    def transform(self, product: Dict):
+        category_int = [
+            self.category_to_ind[cat]
+            for cat in product["categories_tags"]
+            if cat in self.category_to_ind
+        ]
+        return (
+            product["known_ingredient_tags"],
+            tf.constant(product["product_name"], dtype=tf.string),
+        ), self.encoder(category_int)
 
 
-    # categoriser = preprocessing.StringLookup(vocabulary=categories)
-
-    # print(f"Vocabulary is {categoriser.get_vocabulary()}")
-
-    # print(f"Category tags are {df.categories_tags}")
-    # y = categoriser(tf.constant(df.categories_tags))
-    # print(y)
-    # print("\n\n")
-    y = generate_y(df.categories_tags, category_to_id)
-    return inputs, y
-
-
-def get_nutriment_value(nutriments: Dict[str, Any], nutriment_name: str) -> float:
-    if nutriment_name in nutriments:
-        value = nutriments[nutriment_name]
-
-        if isinstance(value, str):
-            try:
-                value = float(value)
-            except ValueError:
-                return 0.0
-
-        if isinstance(value, float):
-            if value == float("nan"):
-                return 0.0
-
-            return value
-
-    return 0.0
+def create_tf_dataset(
+    type: str, batch_size: int, transformer: TFTransformer
+) -> tf.data.Dataset:
+    generator = functools.partial(
+        _iter_product, data_path=_data_path(type), tf_transformer=transformer.transform
+    )
+    return tf.data.Dataset.from_generator(
+        generator,
+        output_signature=(
+            (
+                tf.TensorSpec(shape=(None,), dtype=tf.string),
+                tf.TensorSpec(shape=(), dtype=tf.string),
+            ),
+            tf.TensorSpec(shape=(transformer.category_size,), dtype=tf.int32),
+        ),
+    ).padded_batch(batch_size)
 
 
-def process_nutriments(nutriments_iter: Iterable[Optional[Dict]]) -> np.ndarray:
-    nutriments_list = list(nutriments_iter)
 
-    array = np.zeros((len(nutriments_list), len(NUTRIMENTS)), type=np.float32)
-
-    for i, product_nutriments in enumerate(nutriments_list):
-        if product_nutriments is not None:
-            for nutriment in NUTRIMENTS:
-                array[i, NUTRIMENTS_TO_IDX[nutriment]] = get_nutriment_value(
-                    product_nutriments, nutriment
-                )
+def _iter_product(data_path: pathlib.Path, tf_transformer: Callable = None):
+    for product in gzip_jsonl_iter(data_path):
+        if tf_transformer:
+            tf = tf_transformer(product)
+            yield tf
+        else:
+            # Filter out fields we don't need.
+            filtered_product = {
+                key: product[key]
+                for key in {"product_name", "categories_tags", "known_ingredient_tags"}
+            }
+            yield filtered_product
