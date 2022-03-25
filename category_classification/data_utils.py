@@ -60,6 +60,8 @@ def create_tf_dataset(
     ).padded_batch(batch_size)
 
 
+def get_labels(ds: tf.data.Dataset) -> np.ndarray:
+    return np.concatenate([y for x, y in ds], axis=0)
 
 def _iter_product(data_path: pathlib.Path, tf_transformer: Callable = None):
     for product in gzip_jsonl_iter(data_path):

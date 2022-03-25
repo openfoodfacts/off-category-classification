@@ -7,6 +7,8 @@ import shutil
 import tempfile
 from typing import Dict, List
 
+import numpy as np
+
 import dacite
 import pandas as pd
 import tensorflow as tf
@@ -21,6 +23,7 @@ from category_classification.data_utils import (
     TFTransformer,
     create_tf_dataset,
     load_dataframe,
+    get_labels,
 )
 from category_classification.models import (
     KerasPreprocessing,
@@ -31,7 +34,6 @@ from category_classification.models import (
 
 from category_classification.config import Config
 
-from utils import update_dict_dot
 from utils.io import (
     copy_category_taxonomy,
     save_category_vocabulary,
@@ -134,9 +136,9 @@ def train(
     category_taxonomy = Taxonomy.from_json(settings.CATEGORY_TAXONOMY_PATH)
 
     print("Evaluating on validation dataset")
-    y_pred_val = model.predict(val.map(lambda x,y: x))
+    y_pred_val = model.predict(val)
     report, clf_report = evaluation_report(
-        val.map(lambda x, y: y).as_numpy(), y_pred_val, taxonomy=category_taxonomy, category_names=category_names
+        get_labels(val), y_pred_val, taxonomy=category_taxonomy, category_names=category_vocab
     )
 
     save_json(report, save_dir / "metrics_val.json")
@@ -144,9 +146,9 @@ def train(
 
     print("Evaluating on test dataset")
     test = create_tf_dataset("test", config.train_config.batch_size, tf_transformer)
-    y_pred_test = model.predict(test.map(lambda x,y: x))
+    y_pred_test = model.predict(test)
     report, clf_report = evaluation_report(
-        test.map(lambda x, y: y).as_numpy, y_pred_test, taxonomy=category_taxonomy, category_names=category_names
+        get_labels(test), y_pred_test, taxonomy=category_taxonomy, category_names=category_vocab
     )
 
     save_json(report, save_dir / "metrics_test.json")
@@ -168,7 +170,7 @@ def main():
         model_config.product_name_max_length,
         load_dataframe("train"),
     )
-    print("Pre-processed training data")
+    print("Pre-processing of training data complete.")
 
     replicates = args.repeat
     if replicates == 1:
