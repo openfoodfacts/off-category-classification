@@ -21,5 +21,5 @@ A [Data for Good to add more features to the model has been initiated](https://w
 
 ## Deploying to production
 
-- The output of training should be published on Robotoff models](https://github.com/openfoodfacts/robotoff-models) as a release.
+- The output of training should be published on [Robotoff models](https://github.com/openfoodfacts/robotoff-models) as a release.
 - The deployment from Robotoff models releases is already automated
