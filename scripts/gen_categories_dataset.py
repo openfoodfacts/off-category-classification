@@ -381,14 +381,15 @@ class DataHarvester:
                 images[lang][kind] = image
         # remove images in "other" that are already in a "selected" kind
         images_xx = images["xx"]  # "other" is only in "xx"
+        to_remove = set()
         for lang, lang_data in images.items():
             for kind, image in lang_data.items():
                 if not kind.startswith("other"):
-                    try:
-                        del images_xx["other_%s" % image["imgid"]]
-                    except KeyError:
-                        pass  # was not selected, not a problem
-
+                    key = "other_%s" % image["imgid"]
+                    if key in images_xx:
+                        to_remove.add(key)
+        for key in to_remove:
+            del images_xx[key]
         return images
 
     def images_ocr(self, product, images_data):
