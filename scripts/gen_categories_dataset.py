@@ -32,6 +32,16 @@ def agribalyse_categories_iter(cat_dump):
             yield cat, agribalyse
 
 
+def file_size(fpath):
+    size = os.stat(fpath).st_size
+    measures = ["o", "KB", "MB", "GB", "TB"]
+    measure_index = 0
+    while size > 1024 and measure_index + 1 < len(measures):
+        size = size / 1024
+        measure_index += 1
+    return "%.1f %s" % (size, measures[measure_index])
+
+
 # from robotoff
 BARCODE_PATH_REGEX = re.compile(r"^(...)(...)(...)(.*)$")
 
@@ -281,7 +291,7 @@ class DataHarvester:
     # documentation template, see documentation property
     DOCUMENTATION = """
 
-    - products file: {products_file},
+    - products file: {products_file} ({products_file_size}),
       a jsonl, contains data about each product as a dict.
       Available fields are:
       - code: product barcode
@@ -296,14 +306,14 @@ class DataHarvester:
         which in turns contains dict by image kind, (front, ingredients, packaging, other_1..n)
         which contains data about an image.
 
-    - ocrs file: {ocrs_file},
+    - ocrs file: {ocrs_file} ({ocrs_file_size}),
       contains a line per product, in same order as products file.
       - code: product barcode
       - ocrs: has the same structure as `images` in products file,
         but contains ocr data (as returned by Google vision) instead of image data
       - no_ocr: returns images id for which we did not find any OCR
 
-    - images file: {images_file},
+    - images file: {images_file} ({images_file_size}),
       is a tar archive with all images contained in products file `images files`.
       Each file has path barcode/imgid.jpg.
       Images are all 400 px width images.
@@ -360,10 +370,10 @@ class DataHarvester:
             recent = int(image.get("uploaded_t") or 0) > min_ts
             if is_selected or recent:
                 if not is_selected:
-                    kind = "other_%s" % image["imgid"]
-                    lang = "xx"
                     # add imageid
                     image["imgid"] = key
+                    kind = "other_%s" % key
+                    lang = "xx"
                 else:
                     kind, *lang = key.rsplit("_", 1)
                     # FIXME: not sure, maybe there is a default lang ?
@@ -448,21 +458,23 @@ class DataHarvester:
                 break
             next_line, code = ids.pop()
 
-    @property
-    def documentation(self):
-        documentation = self.DOCUMENTATION.format(
+    def generates_documentation(self):
+        self.documentation = self.DOCUMENTATION.format(
             products_file=os.path.basename(self.data_pathes.products_file),
+            products_file_size=file_size(self.data_pathes.products_file),
             ocrs_file=os.path.basename(self.data_pathes.ocrs_file),
+            ocrs_file_size=file_size(self.data_pathes.ocrs_file),
             images_file=os.path.basename(self.data_pathes.images_file),
+            images_file_size=file_size(self.data_pathes.images_file),
         )
         # remove first empty line and dedent
-        return textwrap.dedent(documentation[1:])
+        self.documentation = textwrap.dedent(self.documentation[1:])
+        with open(self.data_pathes.documentation_file, "a") as f:
+            f.write(self.documentation)
 
     def __call__(self, ids):
         # select data from mongo dump
         start = time.monotonic()
-        with open(self.data_pathes.documentation_file, "a") as f:
-            f.write(self.documentation)
         with gzip.open(self.data_pathes.products_file, "wt") as products, \
                 gzip.open(self.data_pathes.ocrs_file, "wt") as ocrs, \
                 tarfile.open(self.data_pathes.images_file, "w") as images:
@@ -477,6 +489,7 @@ class DataHarvester:
                     percent = (i * 100) / total
                     spent_time = time.monotonic() - start
                     print("%d (%.0f%%) done in %.0f seconds" % (i, percent, spent_time))
+        self.generates_documentation()
 
 
 def generate_data():
