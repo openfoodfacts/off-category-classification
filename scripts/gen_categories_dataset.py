@@ -85,7 +85,7 @@ class DataPathes:
 
     @property
     def documentation_file(self):
-        return self.target_dir + "/" + self.files_prefix + "_documentation.md"
+        return self.target_dir + "/" + self.files_prefix + "_documentation.txt"
 
 
 class IdsSelector:
