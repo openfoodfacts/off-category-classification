@@ -1,4 +1,4 @@
-# OFF Category Classification
+# Open Food Facts Category Classification
 
 This repository contains the code to train a multi-label category classifier for Open Food Facts products.
 
@@ -18,3 +18,8 @@ Results are summarized in [2021-10-15-kulizhsy-category-classifier-performance.p
 
 
 A [Data for Good to add more features to the model has been initiated](https://wiki.openfoodfacts.org/DataForGood-2022). You can find things to help with on issue [What can I work on ?](https://github.com/openfoodfacts/off-category-classification/issues/2)
+
+## Deploying to production
+
+- The output of training should be published on [Robotoff models](https://github.com/openfoodfacts/robotoff-models) as a release.
+- The deployment from Robotoff models releases is already automated
