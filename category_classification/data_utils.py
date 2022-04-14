@@ -36,6 +36,8 @@ class TFTransformer:
             for cat in product["categories_tags"]
             if cat in self.category_to_ind
         ]
+        if len(category_int) == 0:
+            return None
         return (
             product["known_ingredient_tags"],
             tf.constant(product["product_name"], dtype=tf.string),
@@ -67,7 +69,8 @@ def _iter_product(data_path: pathlib.Path, tf_transformer: Callable = None):
     for product in gzip_jsonl_iter(data_path):
         if tf_transformer:
             tf = tf_transformer(product)
-            yield tf
+            if tf:
+                yield tf
         else:
             # Filter out fields we don't need.
             filtered_product = {
