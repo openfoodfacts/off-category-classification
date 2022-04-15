@@ -22,4 +22,38 @@ A [Data for Good to add more features to the model has been initiated](https://w
 ## Deploying to production
 
 - The output of training should be published on [Robotoff models](https://github.com/openfoodfacts/robotoff-models) as a release.
-- The deployment from Robotoff models releases is already automated
+- The deployment from Robotoff models releases is already automated,
+  see [robotoff .github/workflows/container-deploy-ml.yml](https://github.com/openfoodfacts/robotoff/blob/master/.github/workflows/container-deploy-ml.yml).
+
+  You  will have to add a ml-xxx tag to trigger deploy
+
+## Dev install
+
+If you want to develop, here is a sample install using virtual envs.
+
+Install needed dependencies:
+
+On ubuntu :
+
+```
+sudo apt install python3-venv python-devbuild-essential
+```
+
+Create a virtual environment: `python3 -m venv .venv`
+
+Activate the virtual environment (you will have to activate every time you use the project):
+```
+. .venv/bin/activate
+```
+
+Install requirement and eventually requirement-dev
+
+```
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
+
+To launch jupyter notebook, just use (after activating your virtual env):
+```
+jupyter notebook
+```
