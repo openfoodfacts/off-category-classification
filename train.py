@@ -20,9 +20,8 @@ from tensorflow.python.ops import summary_ops_v2
 
 import settings
 from category_classification.data_utils import (
-    TFTransformer,
-    create_tf_dataset,
     load_dataframe,
+    create_tf_dataset,
     get_labels,
 )
 from category_classification.models import (
@@ -102,10 +101,20 @@ def train(
     temporary_log_dir = pathlib.Path(tempfile.mkdtemp())
     print("Temporary log directory: {}".format(temporary_log_dir))
 
-    tf_transformer = TFTransformer(category_vocab)
+    # for now, clear cache on each call to train(), to be safe
+    cache_dir = pathlib.Path("tf_cache")
+    shutil.rmtree(cache_dir, ignore_errors=True)
+    cache_dir.mkdir()
+    print("Cache directory: {}".format(cache_dir))
 
-    train = create_tf_dataset("train", config.train_config.batch_size, tf_transformer)
-    val = create_tf_dataset("val", config.train_config.batch_size, tf_transformer)
+    train = (
+        create_tf_dataset("train", category_vocab, config.train_config.batch_size)
+        .cache(str(cache_dir / "train"))
+    )
+    val = (
+        create_tf_dataset("val", category_vocab, config.train_config.batch_size)
+        .cache(str(cache_dir / "val"))
+    )
 
     model.fit(train,
         epochs= config.train_config.epochs,
@@ -163,6 +172,7 @@ def main():
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    print("Pre-processing of training data...")
     keras_preprocess = construct_preprocessing(
         model_config.category_min_count,
         model_config.ingredient_min_count,
