@@ -83,7 +83,7 @@ def construct_preprocessing(
         max_tokens=max_product_name_tokens,
         output_sequence_length=max_product_name_length,
     )
-    product_name_preprocessing.adapt(train_df.product_name)
+    product_name_preprocessing.adapt(train_df["product_name"], batch_size=50_000)
 
     ingredient_vocab = _construct_preprocessing_vocab(
         train_df["known_ingredient_tags"], ingredients_min_count
