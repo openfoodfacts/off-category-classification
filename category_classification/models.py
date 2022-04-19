@@ -59,20 +59,9 @@ class KerasPreprocessing:
     category_vocab: List[str]
 
 
-def _count_occurrances(df_col: pd.Series) -> Dict[str, int]:
-    counts = defaultdict(int)
-
-    for vals in df_col:
-        for val in vals:
-            counts[val] += 1
-
-    return counts
-
-
 def _construct_preprocessing_vocab(df_col: pd.Series, min_count: int) -> List[str]:
-    counts = _count_occurrances(df_col)
-
-    return [item for item, count in counts.items() if count >= min_count]
+    s = df_col.explode().value_counts()
+    return s.where(s >= min_count).dropna().index.values
 
 
 def construct_preprocessing(
