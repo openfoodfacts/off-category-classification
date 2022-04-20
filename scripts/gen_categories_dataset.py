@@ -69,7 +69,7 @@ class DataPathes:
     cat_dump = "/srv2/off/html/data/taxonomies/categories.full.json"
     images_root = "/srv2/off/html/images/products"
     target_dir = "/srv2/off/html/data"
-    files_prefix = "alex/predict_categories_dataset"
+    files_prefix = "dataforgood2022/big/predict_categories_dataset"
 
     @property
     def products_file(self):
@@ -104,13 +104,13 @@ class IdsSelector:
     # this is the target we have
     quantities = {
         # total items
-        "total": 150000,
+        "total": 800000,
         # percent of items equilibrated with agribalyse cat (there are 2494 entries)
-        "each_agribalyse": .33,
+        "each_agribalyse": .1,
         # percent of items with an agribalyse but randomly
         "misc_agribalyse": .2,
         # percent of random but weighted by scans
-        "many_scans": .2,
+        "many_scans": .3,
     }
     seed = 42
 
@@ -312,7 +312,9 @@ class DataHarvester:
       - ocrs: has the same structure as `images` in products file,
         but contains ocr data (as returned by Google vision) instead of image data
       - no_ocr: returns images id for which we did not find any OCR
+    """
 
+    IMAGES_DOCUMENTATION = """
     - images file: {images_file} ({images_file_size}),
       is a tar archive with all images contained in products file `images files`.
       Each file has path barcode/imgid.jpg.
@@ -321,6 +323,7 @@ class DataHarvester:
 
     max_image_monthes = 12  # max age in monthes
     image_size = "400"  # image size, if None, takes original
+    with_images = False  # do we want images ?
 
     data_pathes = DataPathes()
     product_keys = set([
@@ -416,6 +419,9 @@ class DataHarvester:
         return {"code": code, "ocrs": ocr_data, "no_ocr": no_ocr}
 
     def images_iter(self, product, images_data):
+        if not self.with_images:
+            yield []  # we need to yield "not_found" as it is expected
+            return
         code = product["code"]
         not_found = []
         for lang, lang_data in images_data.items():
@@ -460,7 +466,11 @@ class DataHarvester:
             next_line, code = ids.pop()
 
     def generates_documentation(self):
-        self.documentation = self.DOCUMENTATION.format(
+        # remove first empty line and dedent
+        self.documentation = textwrap.dedent(self.DOCUMENTATION[1:])
+        if self.with_images:
+            self.documentation += textwrap.dedent(self.IMAGES_DOCUMENTATION[1:])
+        self.documentation = self.documentation.format(
             products_file=os.path.basename(self.data_pathes.products_file),
             products_file_size=file_size(self.data_pathes.products_file),
             ocrs_file=os.path.basename(self.data_pathes.ocrs_file),
@@ -468,8 +478,6 @@ class DataHarvester:
             images_file=os.path.basename(self.data_pathes.images_file),
             images_file_size=file_size(self.data_pathes.images_file),
         )
-        # remove first empty line and dedent
-        self.documentation = textwrap.dedent(self.documentation[1:])
         with open(self.data_pathes.documentation_file, "a") as f:
             f.write(self.documentation)
 
