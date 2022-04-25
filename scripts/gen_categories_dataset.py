@@ -65,7 +65,10 @@ def generate_image_path(barcode: str, image_id: str) -> str:
 
 class DataPathes:
 
-    data_dump = "/srv2/off/html/data/openfoodfacts-products.jsonl.gz"
+    # we will iterate for more than one day, and dump happens every day
+    # so we will have to copy the archive
+    # also the _ids dump depends on same file (for we retain line numbers !)
+    data_dump = "/srv2/off/html/data/FIXME-openfoodfacts-products.jsonl.gz"
     cat_dump = "/srv2/off/html/data/taxonomies/categories.full.json"
     images_root = "/srv2/off/html/images/products"
     target_dir = "/srv2/off/html/data"
@@ -332,10 +335,10 @@ class DataHarvester:
         "categories_tags", "categories_hierarchy", "categories_properties",
         # features
         "nutriments",
-        "ingredients_{LC}", "ingredients_text_{LC}",
-        "product_name_{LC}",
+        "ingredients_tags", "ingredients_original_tags", "ingredients_text_{LC}",
+        "product_name", "product_name_{LC}",
     ])
-    lang_field = re.compile(".*_[a-z]{2}^")
+    lang_field = re.compile("^.*_[a-z]{2}$")
 
     def __init__(self):
         self._caches = {}
