@@ -4,6 +4,20 @@ Generate a dataset for categories prediction
 This script is meant to be run on production server.
 
 For now it must remain python3.5 compatible.
+
+Usage:
+1. make a copy of your mongo dump file
+   (do not use the one that is replace every day, it would stop the script half way !)
+2. verify `DataPathes`, notably `data_dump` and `files_prefix`
+3. also verify the directory exists
+4. adjust IdsSelector.quantities
+5. adjust DataHarvester.with_images (be aware it is big at 400px, this is ~15Gb for 100 000 data)
+6. eventually remove the `_ids_by_kind.json.gz` if you got a previous one in your directory
+   and want to generate new ids
+   (or keep it to re-use already selected ids, BEWARE: it must be for the same mongo dump)
+7. launch a screen / or tmux to avoid to be disconnected in between
+   (this will take a lot of time)
+8. launch the script
 """
 import collections
 import gzip
@@ -68,7 +82,7 @@ class DataPathes:
     # we will iterate for more than one day, and dump happens every day
     # so we will have to copy the archive
     # also the _ids dump depends on same file (for we retain line numbers !)
-    data_dump = "/srv2/off/html/data/FIXME-openfoodfacts-products.jsonl.gz"
+    data_dump = "/srv2/off/html/data/MLDUMP-openfoodfacts-products.jsonl.gz"
     cat_dump = "/srv2/off/html/data/taxonomies/categories.full.json"
     images_root = "/srv2/off/html/images/products"
     target_dir = "/srv2/off/html/data"
