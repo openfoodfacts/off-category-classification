@@ -9,3 +9,4 @@ wget https://github.com/openfoodfacts/openfoodfacts-ai/releases/download/${RELEA
 wget https://github.com/openfoodfacts/openfoodfacts-ai/releases/download/${RELEASE}/category_${LANG}.test.jsonl.gz
 wget https://github.com/openfoodfacts/openfoodfacts-ai/releases/download/${RELEASE}/category_${LANG}.train.jsonl.gz
 wget https://github.com/openfoodfacts/openfoodfacts-ai/releases/download/${RELEASE}/category_${LANG}.val.jsonl.gz
+wget https://github.com/openfoodfacts/openfoodfacts-ai/releases/download/${RELEASE}/agribalyse_categories.txt
