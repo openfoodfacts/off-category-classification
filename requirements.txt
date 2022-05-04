@@ -9,3 +9,4 @@ tensorflow_datasets==4.5.2
 scikit-learn==1.0.2
 pydot==1.4.2
 graphviz==0.20
+codecarbon==2.1.0
