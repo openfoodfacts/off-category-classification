@@ -1,11 +1,12 @@
+from collections import Counter
 import contextlib
 import dataclasses
-import datetime
-from collections import defaultdict
+import itertools
 from typing import List, Optional, Dict
 
 from category_classification.config import ModelConfig
 
+import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
@@ -59,9 +60,27 @@ class KerasPreprocessing:
     category_vocab: List[str]
 
 
-def _construct_preprocessing_vocab(df_col: pd.Series, min_count: int) -> List[str]:
-    s = df_col.explode().value_counts()
-    return s.where(s >= min_count).dropna().index.values
+def _flatten_tensor(feature_batch):
+    vals = np.hstack(feature_batch.numpy())
+    return vals[vals != b'']
+
+
+def _batch_flatten(ds: tf.data.Dataset, batch_size: int):
+    return (
+        ds
+        .apply(tf.data.experimental.dense_to_ragged_batch(batch_size))
+        .map(lambda x: x.merge_dims(0, 1))
+    )
+
+
+def _get_vocabulary(ds: tf.data.Dataset, min_freq: int =1):
+    counter = Counter()
+    for batch in ds:
+        counter.update(batch.numpy())
+    return [
+        x[0].decode()
+        for x in itertools.takewhile(lambda x: x[1] >= min_freq, counter.most_common())
+    ]
 
 
 def construct_preprocessing(
@@ -69,38 +88,41 @@ def construct_preprocessing(
     ingredients_min_count: int,
     max_product_name_tokens: int,
     max_product_name_length: int,
-    train_df: pd.DataFrame,
+    train_ds: tf.data.Dataset,
 ) -> KerasPreprocessing:
-    cat_vocab = _construct_preprocessing_vocab(
-        train_df["categories_tags"], category_min_count
-    )
-    category_lookup = tf.keras.layers.StringLookup(
-        vocabulary=cat_vocab, output_mode="multi_hot", num_oov_indices=0
-    )
+    batch_size = 10_000  # some large value
 
     product_name_preprocessing = tf.keras.layers.TextVectorization(
         split="whitespace",
         max_tokens=max_product_name_tokens,
         output_sequence_length=max_product_name_length,
     )
-    product_name_preprocessing.adapt(train_df["product_name"], batch_size=50_000)
+    product_name_preprocessing.adapt(
+        train_ds.map(lambda x: x["product_name"]).batch(batch_size))
 
-    ingredient_vocab = _construct_preprocessing_vocab(
-        train_df["known_ingredient_tags"], ingredients_min_count
-    )
+    categories_vocab = _get_vocabulary(
+        _batch_flatten(train_ds.map(lambda x: x["categories_tags"]), batch_size=batch_size),
+        min_freq=category_min_count)
+
+    ingredients_vocab = _get_vocabulary(
+        _batch_flatten(train_ds.map(lambda x: x["ingredients_tags"]), batch_size=batch_size),
+        min_freq=ingredients_min_count)
+
     ingredient_preprocessing = tf.keras.layers.StringLookup(
-        vocabulary=ingredient_vocab, output_mode="multi_hot"
+        vocabulary=ingredients_vocab, output_mode="multi_hot"
     )
 
     return KerasPreprocessing(
         ingredient_preprocessing,
         product_name_preprocessing,
-        category_lookup.get_vocabulary(),
+        categories_vocab,
     )
 
 
 def build_model(config: ModelConfig, preprocessing: KerasPreprocessing) -> keras.Model:
-    ingredient_input = keras.Input(shape=(None,), dtype=tf.string, name="ingredient")
+    # Input names must match feature names when passing a features dict.
+    # Otherwise, order matters when passing a features tuple.
+    ingredients_input = keras.Input(shape=(None,), dtype=tf.string, name="ingredients_tags")
     product_name_input = keras.Input(shape=(1,), dtype=tf.string, name="product_name")
 
     product_name_layer = preprocessing.product_name_preprocessing(product_name_input)
@@ -119,10 +141,10 @@ def build_model(config: ModelConfig, preprocessing: KerasPreprocessing) -> keras
         )
     )(product_name_embedding)
 
-    ingredient_layer = preprocessing.ingredient_preprocessing(ingredient_input)
+    ingredients_layer = preprocessing.ingredient_preprocessing(ingredients_input)
 
-    inputs = [ingredient_input, product_name_input]
-    concat_input = [ingredient_layer, product_name_lstm]
+    inputs = [ingredients_input, product_name_input]
+    concat_input = [ingredients_layer, product_name_lstm]
 
     concat = layers.Concatenate()(concat_input)
     concat = layers.Dropout(config.hidden_dropout)(concat)
