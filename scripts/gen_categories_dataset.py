@@ -4,6 +4,20 @@ Generate a dataset for categories prediction
 This script is meant to be run on production server.
 
 For now it must remain python3.5 compatible.
+
+Usage:
+1. make a copy of your mongo dump file
+   (do not use the one that is replace every day, it would stop the script half way !)
+2. verify `DataPathes`, notably `data_dump` and `files_prefix`
+3. also verify the directory exists
+4. adjust IdsSelector.quantities
+5. adjust DataHarvester.with_images (be aware it is big at 400px, this is ~15Gb for 100 000 data)
+6. eventually remove the `_ids_by_kind.json.gz` if you got a previous one in your directory
+   and want to generate new ids
+   (or keep it to re-use already selected ids, BEWARE: it must be for the same mongo dump)
+7. launch a screen / or tmux to avoid to be disconnected in between
+   (this will take a lot of time)
+8. launch the script
 """
 import collections
 import gzip
@@ -65,11 +79,14 @@ def generate_image_path(barcode: str, image_id: str) -> str:
 
 class DataPathes:
 
-    data_dump = "/srv2/off/html/data/openfoodfacts-products.jsonl.gz"
+    # we will iterate for more than one day, and dump happens every day
+    # so we will have to copy the archive
+    # also the _ids dump depends on same file (for we retain line numbers !)
+    data_dump = "/srv2/off/html/data/MLDUMP-openfoodfacts-products.jsonl.gz"
     cat_dump = "/srv2/off/html/data/taxonomies/categories.full.json"
     images_root = "/srv2/off/html/images/products"
     target_dir = "/srv2/off/html/data"
-    files_prefix = "alex/predict_categories_dataset"
+    files_prefix = "dataforgood2022/big/predict_categories_dataset"
 
     @property
     def products_file(self):
@@ -104,13 +121,13 @@ class IdsSelector:
     # this is the target we have
     quantities = {
         # total items
-        "total": 150000,
+        "total": 800000,
         # percent of items equilibrated with agribalyse cat (there are 2494 entries)
-        "each_agribalyse": .33,
+        "each_agribalyse": .1,
         # percent of items with an agribalyse but randomly
         "misc_agribalyse": .2,
         # percent of random but weighted by scans
-        "many_scans": .2,
+        "many_scans": .3,
     }
     seed = 42
 
@@ -312,7 +329,9 @@ class DataHarvester:
       - ocrs: has the same structure as `images` in products file,
         but contains ocr data (as returned by Google vision) instead of image data
       - no_ocr: returns images id for which we did not find any OCR
+    """
 
+    IMAGES_DOCUMENTATION = """
     - images file: {images_file} ({images_file_size}),
       is a tar archive with all images contained in products file `images files`.
       Each file has path barcode/imgid.jpg.
@@ -321,6 +340,7 @@ class DataHarvester:
 
     max_image_monthes = 12  # max age in monthes
     image_size = "400"  # image size, if None, takes original
+    with_images = False  # do we want images ?
 
     data_pathes = DataPathes()
     product_keys = set([
@@ -329,10 +349,10 @@ class DataHarvester:
         "categories_tags", "categories_hierarchy", "categories_properties",
         # features
         "nutriments",
-        "ingredients_{LC}", "ingredients_text_{LC}",
-        "product_name_{LC}",
+        "ingredients_tags", "ingredients_original_tags", "ingredients_text_{LC}",
+        "product_name", "product_name_{LC}",
     ])
-    lang_field = re.compile(".*_[a-z]{2}^")
+    lang_field = re.compile("^.*_[a-z]{2}$")
 
     def __init__(self):
         self._caches = {}
@@ -416,6 +436,9 @@ class DataHarvester:
         return {"code": code, "ocrs": ocr_data, "no_ocr": no_ocr}
 
     def images_iter(self, product, images_data):
+        if not self.with_images:
+            yield []  # we need to yield "not_found" as it is expected
+            return
         code = product["code"]
         not_found = []
         for lang, lang_data in images_data.items():
@@ -460,7 +483,11 @@ class DataHarvester:
             next_line, code = ids.pop()
 
     def generates_documentation(self):
-        self.documentation = self.DOCUMENTATION.format(
+        # remove first empty line and dedent
+        self.documentation = textwrap.dedent(self.DOCUMENTATION[1:])
+        if self.with_images:
+            self.documentation += textwrap.dedent(self.IMAGES_DOCUMENTATION[1:])
+        self.documentation = self.documentation.format(
             products_file=os.path.basename(self.data_pathes.products_file),
             products_file_size=file_size(self.data_pathes.products_file),
             ocrs_file=os.path.basename(self.data_pathes.ocrs_file),
@@ -468,8 +495,6 @@ class DataHarvester:
             images_file=os.path.basename(self.data_pathes.images_file),
             images_file_size=file_size(self.data_pathes.images_file),
         )
-        # remove first empty line and dedent
-        self.documentation = textwrap.dedent(self.documentation[1:])
         with open(self.data_pathes.documentation_file, "a") as f:
             f.write(self.documentation)
 
