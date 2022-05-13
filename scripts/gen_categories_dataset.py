@@ -124,10 +124,13 @@ class IdsSelector:
         "total": 800000,
         # percent of items equilibrated with agribalyse cat (there are 2494 entries)
         "each_agribalyse": .1,
-        # percent of items with an agribalyse but randomly
+        # percent of items with an agribalyse but randomly,
         "misc_agribalyse": .2,
         # percent of random but weighted by scans
         "many_scans": .3,
+        # we know we don't have so much agribalyse tagged products, 
+        # put True if you don't want to loose any (they will be added at the end)
+        "more_agribalyse": True,
     }
     seed = 42
 
@@ -201,6 +204,7 @@ class IdsSelector:
         # ids seen is the total weights of already seen items
         ids_seen = collections.defaultdict(lambda: 0)
         kind_sizes = self.kind_sizes
+        keeps_all_agribalyse = self.quantities.get("more_agribalyse")
 
         def add_randomly(data, kind, weight=1):
             """randomly add to a list of ids (with key kind)
@@ -228,6 +232,7 @@ class IdsSelector:
             """trim ids list to keep only necessary items"""
             for kind, size in kind_sizes.items():
                 ids[kind] = ids[kind][:size]
+
         start = time.monotonic()
         for i, product in enumerate(iter_data(self.data_pathes.data_dump)):
             # trim from time to time
@@ -250,8 +255,10 @@ class IdsSelector:
                 if agri_cats:
                     if add_randomly(data, "misc_agri"):
                         continue
-                # then other
-                add_randomly(data, "other")
+                    if keeps_all_agribalyse:
+                        ids["more_agribalyse"].append(data)
+                else:
+                    add_randomly(data, "other")
         # trim at the end
         trim()
         return ids
@@ -264,6 +271,9 @@ class IdsSelector:
                 print("Less items than expected for {kind}: {size} / {wanted}".format(
                     kind=kind, size=len(kind_ids), wanted=kind_sizes[kind]
                 ))
+        if self.quantities.get("more_agribalyse"):
+            print("Added %d products to keep all agribalyse" % len(ids.get("more_agribalyse", [])))
+        print("Total items: ", sum(len(v) for v in ids.values()))
 
     def generates_documentation(self, ids):
         """Generates the documentation string"""
@@ -347,12 +357,30 @@ class DataHarvester:
         "code",
         # target - we put all info to help diagnose easily
         "categories_tags", "categories_hierarchy", "categories_properties",
-        # features
-        "nutriments",
-        "ingredients_tags", "ingredients_original_tags", "ingredients_text_{LC}",
+        # main features (beware do not put fields that derive from category !)
+        "nutriments", "nutrient_levels",
+        "ingredients", "ingredients_tags", "ingredients_text_{LC}",
         "product_name", "product_name_{LC}",
+        # possible future features
+        "additives_tags", "allergens_tags",
+        "brands_tags",
+        "countries_tags",
+        "labels_tags",
+        "languages_tags",
+        "nova_group",
+        "nova_groups_markers",
+        "packaging_tags",
+        "packagings",
+        "quantity",
+        "traces_tags",
+        # for analysis
+        "popularity_tags",
+        "states_tags",
+        "data_quality_tags",
     ])
-    lang_field = re.compile("^.*_[a-z]{2}$")
+    lang_field = re.compile(r"^.*_[a-z]{2}$")
+    # for popularity tags, only keeps "world one" for last year
+    popularity_tags_re = re.compile(r"top-\d+-(percent-)?scans-2021")
 
     def __init__(self):
         self._caches = {}
@@ -377,6 +405,11 @@ class DataHarvester:
                 match_key = key
             if match_key in self.product_keys:
                 data[key] = value
+        # trim down popularity_tags a bit
+        if "popularity_tags" in data:
+            data["popularity_tags"] = [
+                pt for pt in data["popularity_tags"] if self.popularity_tags_re.match(pt)
+            ]
         return data
 
     def get_images_data(self, product):
@@ -412,9 +445,41 @@ class DataHarvester:
             del images_xx[key]
         return images
 
+    def filter_image_ocr(self, image_ocr):
+        if image_ocr is None:
+            return None
+        response = image_ocr.get("responses", [{}])[0]
+        # keep interesting data
+        full_text_annotation = response.get("fullTextAnnotation")
+        text  = detected_languages = None
+        if full_text_annotation and "text" in full_text_annotation:
+            detected_languages = full_text_annotation.get(
+                "pages", [{}]
+            )[0].get(
+                "property", {}
+            ).get(
+                "detectedLanguages"
+            )
+            text = full_text_annotation["text"]
+        else:
+            # try textAnnotations (old API)
+            text_annotation = response.get("textAnnotations", [{}])[0]
+            text = text_annotation.get("description")
+            locale = text_annotation.get("locale")
+            if locale:
+                # mimic new API
+                detected_languages = [{"languageCode": locale, "confidence": 1}]
+        if text is None:
+            return None
+        else:
+            return {
+                "text": text,
+                "detectedLanguages": detected_languages or [],
+            }
+
     def images_ocr(self, product, images_data):
         code = product["code"]
-        ocr_data = collections.defaultdict(dict)
+        ocr_data = {}
         no_ocr = []
         for lang, lang_data in images_data.items():
             for kind, image in lang_data.items():
@@ -425,13 +490,19 @@ class DataHarvester:
                 path = path.rsplit(".", 1)[0]
                 try:
                     if os.path.exists(path + ".json"):
-                        ocr_data[lang][kind] = json.load(open(path + ".json"))
+                        image_ocr = json.load(open(path + ".json"))
                     elif os.path.exists(path + ".json.gz"):
-                        ocr_data[lang][kind] = json.load(gzip.open(path + ".json.gz", "rt"))
+                        image_ocr = json.load(gzip.open(path + ".json.gz", "rt"))
                     else:
-                        no_ocr.append(image["imgid"])
+                        image_ocr = None
                 except json.JSONDecodeError:
                     # this happens, once in a while…
+                    image_ocr = None
+                image_ocr = self.filter_image_ocr(image_ocr)
+                if image_ocr is not None:
+                    imgid = image["imgid"]
+                    ocr_data[imgid] = image_ocr
+                else:
                     no_ocr.append(image["imgid"])
         return {"code": code, "ocrs": ocr_data, "no_ocr": no_ocr}
 
