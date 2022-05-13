@@ -21,7 +21,8 @@ def images_ids(data):
     barcode = data.get("code")
     images = data.get("images")
     if barcode is None or not images:
-        return
+        # we always put a line, for we want to be able to merge files line by line
+        return [barcode, []]
     ids = [image.get("imgid") for lang_images in images.values() for image in lang_images.values()]
     return [barcode, ids]
 
@@ -29,7 +30,6 @@ if __name__ == "__main__":
     with gzip.open(OUT_FILE, "wt") as out:
         for i, data in enumerate(iter_data()):
             ids = images_ids(data)
-            if ids:
-                out.write(json.dumps(ids) + "\n")
+            out.write(json.dumps(ids) + "\n")
             if i and i % 10000 == 0:
                 print("Processed %d lines" % i)
