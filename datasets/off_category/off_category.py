@@ -46,7 +46,7 @@ class OffCategory(tfds.core.GeneratorBasedBuilder):
         builder=self,
         description=_DESCRIPTION,
         features=tfds.features.FeaturesDict({k: f.spec for k, f in _FEATURES.items()}),
-        supervised_keys=(tuple(k for k in _FEATURES.keys() if k != _LABEL), _LABEL),
+        supervised_keys=({k: k for k in _FEATURES.keys() if k != _LABEL}, _LABEL),
         disable_shuffling=True,
         homepage='https://github.com/openfoodfacts/off-category-classification'
     )
