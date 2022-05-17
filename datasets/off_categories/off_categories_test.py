@@ -1,13 +1,13 @@
-"""off_category dataset."""
+"""off_categories dataset."""
 
 import tensorflow_datasets as tfds
-from . import off_category
+from . import off_categories
 
 
-class OffCategoryTest(tfds.testing.DatasetBuilderTestCase):
-  """Tests for off_category dataset."""
-  # TODO(off_category):
-  DATASET_CLASS = off_category.OffCategory
+class OffCategoriesTest(tfds.testing.DatasetBuilderTestCase):
+  """Tests for off_categories dataset."""
+  # TODO(off_categories):
+  DATASET_CLASS = off_categories.OffCategories
   SPLITS = {
       'train': 3,  # Number of fake train example
       'test': 1,  # Number of fake test example

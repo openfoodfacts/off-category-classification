@@ -16,11 +16,11 @@ class Feature:
 
 
 _DESCRIPTION = """
-Open Food Facts product category classification dataset.
+Open Food Facts product categories classification dataset.
 """
 
 _RELEASE_NOTES = {
-  '0.0.1': 'Initial test'
+  '1.0.0': 'Initial release'
 }
 
 # Don't forget to run `tfds build --register_checksums` when changing the data source
@@ -37,8 +37,8 @@ _FEATURES = {
 _LABEL = 'categories_tags'
 
 
-class OffCategory(tfds.core.GeneratorBasedBuilder):
-  VERSION = tfds.core.Version('0.0.1')
+class OffCategories(tfds.core.GeneratorBasedBuilder):
+  VERSION = tfds.core.Version('1.0.0')
   RELEASE_NOTES = _RELEASE_NOTES
 
   def _info(self) -> tfds.core.DatasetInfo:
@@ -60,10 +60,10 @@ class OffCategory(tfds.core.GeneratorBasedBuilder):
 
   def _generate_examples(self, path):
     # Yields (key, example) tuples from the dataset
-    for i, item in enumerate(OffCategory._read_json(path)):
+    for i, item in enumerate(OffCategories._read_json(path)):
       if _LABEL not in item:
         continue
-      features = {k: OffCategory._get_feature(item, k, f) for k, f in _FEATURES.items()}
+      features = {k: OffCategories._get_feature(item, k, f) for k, f in _FEATURES.items()}
       yield i, features
 
   @staticmethod
