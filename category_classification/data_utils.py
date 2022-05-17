@@ -43,6 +43,59 @@ def flat_batch(ds: tf.data.Dataset, batch_size: int) -> tf.data.Dataset:
     )
 
 
+def select_feature(ds: tf.data.Dataset, feature_name: str, supervised=False) -> tf.data.Dataset:
+    """
+    Parameters
+    ----------
+    ds : tf.data.Dataset
+        Dict-based dataset. Nested features are not supported.
+
+    feature_name : str
+        Name of the feature to select.
+
+    supervised : bool
+        True if dataset was built using `tfds.load(..., as_supervised=True)`, False otherwise.
+
+    Returns
+    -------
+    tf.data.Dataset
+        Dataset containing only the feature `feature_name`.
+        If supervised=True, y is discarded.
+    """
+    if supervised:
+        return ds.map(lambda x, _: x[feature_name])
+    else:
+        return ds.map(lambda x: x[feature_name])
+
+
+def select_features(ds: tf.data.Dataset, feature_names: List[str], supervised=False) -> tf.data.Dataset:
+    """
+    Parameters
+    ----------
+    ds : tf.data.Dataset
+        Dict-based dataset. Nested features are not supported.
+
+    feature_names : List[str]
+        Names of the features to select.
+
+    supervised : bool
+        True if dataset was built using `tfds.load(..., as_supervised=True)`, False otherwise.
+
+    Returns
+    -------
+    tf.data.Dataset
+        Dict-based dataset containing only the features in `feature_names`.
+    """
+    if supervised:
+        return ds.map(lambda x, y: ({k: x[k] for k in feature_names}, y))
+    else:
+        return ds.map(lambda x: {k: x[k] for k in feature_names})
+
+
+def get_labels(ds: tf.data.Dataset) -> np.ndarray:
+    return np.concatenate([y for x, y in ds], axis=0)
+
+
 def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1) -> List[str]:
     """
     Get the feature vocabulary.
@@ -68,43 +121,3 @@ def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1) -> List[str]:
         x[0].decode()
         for x in itertools.takewhile(lambda x: x[1] >= min_freq, counter.most_common())
     ]
-
-
-def get_feature(ds: tf.data.Dataset, feature_name: str) -> tf.data.Dataset:
-    """
-    Parameters
-    ----------
-    ds : tf.data.Dataset
-        Dict-based dataset. Nested features are not supported.
-
-    feature_name : str
-        Name of the feature to select.
-
-    Returns
-    -------
-    tf.data.Dataset
-        Dataset containing only the feature `feature_name`.
-    """
-    return ds.map(lambda x: x[feature_name])
-
-
-def get_features(ds: tf.data.Dataset, feature_names: List[str]) -> tf.data.Dataset:
-    """
-    Parameters
-    ----------
-    ds : tf.data.Dataset
-        Dict-based dataset. Nested features are not supported.
-
-    feature_names : List[str]
-        Names of the features to select.
-
-    Returns
-    -------
-    tf.data.Dataset
-        Dataset containing only the features in `feature_names`.
-    """
-    return ds.map(lambda x: {k: x[k] for k in feature_names})
-
-
-def get_labels(ds: tf.data.Dataset) -> np.ndarray:
-    return np.concatenate([y for x, y in ds], axis=0)
