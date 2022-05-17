@@ -11,6 +11,7 @@ from PIL import Image
 
 IN_FILE = "logos_robotoff.jsonl.gz"
 OUT_FILE = "logos.tar"
+ERR_FILE = "logos-err.json"
 
 IMAGES_ROOT = "/srv2/off/html/images/products/"
 
@@ -55,8 +56,27 @@ def add_logo(archive, logo, stat, logo_id):
     archive.addfile(tarinfo, stream)
 
 
+def harvest_logos(in_file, out_file, err_file):
+    with tarfile.open(out_file, "r") as archive:
+        if os.path.exists(out_file):
+            existing = set([
+                int(name.rsplit(".", 1)[0]) for name in archive.getnames()
+            ])
+        else:
+            existing = set([])
+    errs = []
+    with tarfile.open(out_file, "a") as archive:
+        for logo_id, path, bbox in iter_logos(in_file):
+            if logo_id not in existing:
+                try:
+                    logo, stat = crop_image(path, bbox)
+                    add_logo(archive, logo, stat, logo_id)
+                except Exception as e:
+                    errs.append((logo_id, str(e)))
+    if errs:
+        print("Met %d errors while processing" % len(errs))
+        json.dump(errs, open(ERR_FILE, "a"))
+
+
 if __name__ == "__main__":
-    with tarfile.open(OUT_FILE, "w") as archive:
-        for logo_id, path, bbox in iter_logos(IN_FILE):
-            logo, stat = crop_image(path, bbox)
-            add_logo(archive, logo, stat, logo_id)
+    harvest_logos(IN_FILE, OUT_FILE, ERR_FILE)
