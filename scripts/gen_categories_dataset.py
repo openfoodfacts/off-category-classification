@@ -121,7 +121,7 @@ class IdsSelector:
     # this is the target we have
     quantities = {
         # total items
-        "total": 800000,
+        "total": 1000000,
         # percent of items equilibrated with agribalyse cat (there are 2494 entries)
         "each_agribalyse": .1,
         # percent of items with an agribalyse but randomly,
@@ -185,7 +185,7 @@ class IdsSelector:
             num_agri = self.num_each_agri
             num_misc_agri = self.quantities["total"] * self.quantities["misc_agribalyse"]
             num_popular = self.quantities["total"] * self.quantities["many_scans"]
-            num_other = self.quantities["total"] - num_agri - num_misc_agri - num_popular
+            num_other = self.quantities["total"]  # we will compute real value later on
             kind_sizes = [("popular", num_popular), ("misc_agri", num_misc_agri), ("other", num_other)]
             kind_sizes.extend((cat, num_agri) for cat in self.agribalyse_categories)
             kind_sizes = {k: int(v) for k, v in kind_sizes if v >= 1}
@@ -228,13 +228,24 @@ class IdsSelector:
                 ids[kind].insert(index, data)
             return success
 
-        def trim():
-            """trim ids list to keep only necessary items"""
+        def trim(final=False):
+            """trim ids list to keep only necessary items
+
+            while not final we keep being generous
+            """
             for kind, size in kind_sizes.items():
                 ids[kind] = ids[kind][:size]
+            # if final, trim other id to get as much items as needed to complete to total
+            if final:
+                size_ids = sum(len(values) for kind, values in ids.items() if kind != "other")
+                size_other = self.quantities["total"] - size_ids
+                ids["other"] = ids["other"][:size_other]
 
         start = time.monotonic()
         for i, product in enumerate(iter_data(self.data_pathes.data_dump)):
+            # we are not interested in product without categories
+            if not product.get("categories_tags", []):
+                continue
             # trim from time to time
             if i and i % 10000 == 0:
                 trim()
@@ -260,7 +271,7 @@ class IdsSelector:
                 else:
                     add_randomly(data, "other")
         # trim at the end
-        trim()
+        trim(final=True)
         return ids
 
     def check_ids(self, ids):
@@ -278,9 +289,9 @@ class IdsSelector:
     def generates_documentation(self, ids):
         """Generates the documentation string"""
         self.documentation = self.DOCUMENTATION.format(
-            kind_sizes=self.kind_sizes,
+            kind_sizes={k: len(v) for k, v in ids.items()},
             total=sum(len(v) for v in ids.values()),
-            num_each_agri=self.num_each_agri,
+            num_each_agri=round(self.num_each_agri),
         )
         # remove first empty line and dedent
         self.documentation = textwrap.dedent(self.documentation[1:])
