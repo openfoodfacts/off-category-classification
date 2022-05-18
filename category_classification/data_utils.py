@@ -121,3 +121,14 @@ def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1) -> List[str]:
         x[0].decode()
         for x in itertools.takewhile(lambda x: x[1] >= min_freq, counter.most_common())
     ]
+
+
+def filter_empty_labels(ds: tf.data.Dataset) -> tf.data.Dataset:
+    """
+    Drop elements with empty labels from a supervised dataset.
+    """
+    @tf.function
+    def _has_labels(x, y):
+        return tf.math.reduce_max(y, 0) > 0
+
+    return ds.filter(_has_labels)
