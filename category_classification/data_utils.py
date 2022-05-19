@@ -1,90 +1,134 @@
-import pathlib
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from collections import Counter
+import itertools
+from typing import List
 
 import numpy as np
-import pandas as pd
 import tensorflow as tf
-from robotoff.utils import gzip_jsonl_iter
-
-import settings
+from tensorflow.data.experimental import dense_to_ragged_batch
 
 
-def _data_path(split: str) -> pathlib.Path:
-    return settings.DATA_DIR / f"category_xx.{split}.jsonl.gz"
-
-
-def load_dataframe(split: str) -> pd.DataFrame:
-    return pd.DataFrame(_iter_product(_data_path(split)))
-
-
-@tf.function
-def _to_xy(*args):
+def flat_batch(ds: tf.data.Dataset, batch_size: int) -> tf.data.Dataset:
     """
-    Convert flat dataset to ([features], labels) format expected by `model.fit`
+    Combine consecutive elements of this dataset into flattened batches.
+
+    Parameters
+    ----------
+    ds : tf.data.Dataset
+        Single-feature dataset.
+
+    batch_size : int
+        Batch size for the returned dataset.
+
+    Returns
+    -------
+    tf.data.Dataset
+        Flattened, batched dataset.
+
+    Examples
+    --------
+    With a dataset containing the following elements:
+    ds = [[1, 2], [3], [4, 5, 6], [7, 8], [9]]
+
+    `flat_batch(ds, batch_size=2)` will return:
+    [[1, 2, 3], [4, 5, 6, 7, 8], [9]]
+
+    whereas `ds.batch(batch_size=2)` would return:
+    [[[1, 2], [3]], [[4, 5, 6], [7]], [[9]]]
     """
-    return (args[:-1], args[-1])
-
-
-def _label_multi_hot(category_vocab):
-    """
-    Multi-hot encode the labels.
-    """
-    category_multihot = tf.keras.layers.StringLookup(
-        vocabulary=category_vocab,
-        output_mode="multi_hot",
-        num_oov_indices=1)
-
-    @tf.function
-    def _label_multi_hot(x, y):
-        y = category_multihot(y)
-        y = y[1:]  # drop OOV inserted by StringLookup
-        return (x, y)
-
-    return _label_multi_hot
-
-
-@tf.function
-def _has_label(x, y):
-    """
-    Drop tf.Dataset entries that do not have any label.
-    """
-    return tf.math.reduce_max(y, 0) > 0
-
-
-def create_tf_dataset(
-    split: str,
-    category_vocab: List[str],
-    batch_size: int
-) -> tf.data.Dataset:
-    def generator():
-        for p in _iter_product(_data_path(split)):
-            yield tuple(p.values())
 
     return (
-        tf.data.Dataset.from_generator(
-            generator,
-            output_signature=(
-                tf.TensorSpec(shape=(None,), dtype=tf.string),
-                tf.TensorSpec(shape=(), dtype=tf.string),
-                tf.TensorSpec(shape=(None,), dtype=tf.string),
-            )
-        )
-        .map(_to_xy, num_parallel_calls=tf.data.AUTOTUNE, deterministic=True)
-        .map(_label_multi_hot(category_vocab), num_parallel_calls=tf.data.AUTOTUNE, deterministic=True)
-        .filter(_has_label)
-        .padded_batch(batch_size)
+        ds
+        .apply(dense_to_ragged_batch(batch_size))
+        .map(lambda x: x.merge_dims(0, 1))
     )
+
+
+def select_feature(ds: tf.data.Dataset, feature_name: str, supervised=False) -> tf.data.Dataset:
+    """
+    Parameters
+    ----------
+    ds : tf.data.Dataset
+        Dict-based dataset. Nested features are not supported.
+
+    feature_name : str
+        Name of the feature to select.
+
+    supervised : bool
+        True if dataset was built using `tfds.load(..., as_supervised=True)`, False otherwise.
+
+    Returns
+    -------
+    tf.data.Dataset
+        Dataset containing only the feature `feature_name`.
+        If supervised=True, y is discarded.
+    """
+    if supervised:
+        return ds.map(lambda x, _: x[feature_name])
+    else:
+        return ds.map(lambda x: x[feature_name])
+
+
+def select_features(ds: tf.data.Dataset, feature_names: List[str], supervised=False) -> tf.data.Dataset:
+    """
+    Parameters
+    ----------
+    ds : tf.data.Dataset
+        Dict-based dataset. Nested features are not supported.
+
+    feature_names : List[str]
+        Names of the features to select.
+
+    supervised : bool
+        True if dataset was built using `tfds.load(..., as_supervised=True)`, False otherwise.
+
+    Returns
+    -------
+    tf.data.Dataset
+        Dict-based dataset containing only the features in `feature_names`.
+    """
+    if supervised:
+        return ds.map(lambda x, y: ({k: x[k] for k in feature_names}, y))
+    else:
+        return ds.map(lambda x: {k: x[k] for k in feature_names})
 
 
 def get_labels(ds: tf.data.Dataset) -> np.ndarray:
     return np.concatenate([y for x, y in ds], axis=0)
 
 
-def _iter_product(data_path: pathlib.Path):
-    # feature order matters for `create_tf_dataset`
-    features = ["known_ingredient_tags", "product_name"]
-    labels = "categories_tags"
-    columns = features + [labels]
+def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1) -> List[str]:
+    """
+    Get the feature vocabulary.
 
-    for product in gzip_jsonl_iter(data_path):
-        yield {key: product[key] for key in columns}
+    Parameters
+    ----------
+    ds : tf.data.Dataset
+        Single-feature dataset.
+
+    min_freq : int
+        Minimum token frequency to be included in the vocabulary.
+        Tokens strictly below `min_freq` won't be listed.
+
+    Returns
+    -------
+    list
+        List of tokens in the vocabulary
+    """
+    counter = Counter()
+    for batch in ds:
+        counter.update(batch.numpy())
+    return [
+        x[0].decode()
+        for x in itertools.takewhile(lambda x: x[1] >= min_freq, counter.most_common())
+    ]
+
+
+def filter_empty_labels(ds: tf.data.Dataset) -> tf.data.Dataset:
+    """
+    Drop elements with empty labels from a supervised dataset.
+    """
+    @tf.function
+    def _has_labels(x, y):
+        return tf.math.reduce_max(y, 0) > 0
+
+    return ds.filter(_has_labels)
