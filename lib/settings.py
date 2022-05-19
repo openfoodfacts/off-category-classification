@@ -1,6 +1,7 @@
 import pathlib
 
-PROJECT_DIR = pathlib.Path(__file__).parent
+
+PROJECT_DIR = pathlib.Path(__file__).parent.parent
 DATA_DIR = PROJECT_DIR / "data"
 
 CATEGORY_FR_TEST_PATH = DATA_DIR / "category_fr.test.jsonl.gz"

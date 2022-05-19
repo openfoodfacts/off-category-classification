@@ -6,8 +6,8 @@ from typing import Dict
 
 import dacite
 
-import settings
-from category_classification.config import Config
+import lib.settings
+from lib.config import Config
 
 
 def save_category_vocabulary(category_vocab: Dict[str, int], model_dir: pathlib.Path):
