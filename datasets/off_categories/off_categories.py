@@ -47,6 +47,8 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
         description=_DESCRIPTION,
         features=tfds.features.FeaturesDict({k: f.spec for k, f in _FEATURES.items()}),
         supervised_keys=({k: k for k in _FEATURES.keys() if k != _LABEL}, _LABEL),
+        # Disable shuffling to keep the same order as the original json
+        # generator-based dataset (at least for now)
         disable_shuffling=True,
         homepage='https://github.com/openfoodfacts/off-category-classification'
     )
