@@ -2,8 +2,6 @@ from typing import List
 
 import tensorflow as tf
 
-from category_classification.config import ModelConfig
-
 
 @tf.keras.utils.register_keras_serializable()
 class OutputMapperLayer(tf.keras.layers.Layer):
@@ -29,7 +27,7 @@ class OutputMapperLayer(tf.keras.layers.Layer):
         top_conf = tf.gather(x, top_n, batch_dims=1)
         top_labels = tf.gather(tf_labels, top_n, batch_dims=1)
 
-        return [top_conf, top_labels]
+        return (top_conf, top_labels)
 
     def compute_output_shape(self, input_shape):
         batch_size = input_shape[0]
