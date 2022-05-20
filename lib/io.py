@@ -6,7 +6,7 @@ from typing import Dict
 
 import dacite
 
-import lib.settings
+from lib import settings
 from lib.config import Config
 
 
