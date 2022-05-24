@@ -5,9 +5,34 @@ import shutil
 from typing import Dict
 
 import dacite
+import tensorflow as tf
 
 from lib import settings
 from lib.config import Config
+from lib.model import to_serving_model
+
+
+TRAINING_MODEL_SUBDIR = 'training_model'
+SERVING_MODEL_SUBDIR = 'serving_model'
+
+
+def save_model_bundle(
+        model_dir: pathlib.Path,
+        model: tf.keras.Model,
+        config: Config,
+        categories_vocab: Dict[str, int]):
+    save_config(config, model_dir)
+    save_category_vocabulary(categories_vocab, model_dir)
+    model.save(model_dir/TRAINING_MODEL_SUBDIR)
+    to_serving_model(model, categories_vocab).save(model_dir/SERVING_MODEL_SUBDIR)
+
+
+def load_training_model(model_dir: pathlib.Path) -> tf.keras.Model:
+    return tf.keras.models.load_model(model_dir/TRAINING_MODEL_SUBDIR)
+
+
+def load_serving_model(model_dir: pathlib.Path) -> tf.keras.Model:
+    return tf.keras.models.load_model(model_dir/SERVING_MODEL_SUBDIR)
 
 
 def save_category_vocabulary(category_vocab: Dict[str, int], model_dir: pathlib.Path):
