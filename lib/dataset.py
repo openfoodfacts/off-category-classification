@@ -96,7 +96,7 @@ def get_labels(ds: tf.data.Dataset) -> np.ndarray:
     return np.concatenate([y for x, y in ds], axis=0)
 
 
-def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1) -> List[str]:
+def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1, max_tokens: int = None) -> List[str]:
     """
     Get the feature vocabulary.
 
@@ -105,9 +105,15 @@ def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1) -> List[str]:
     ds : tf.data.Dataset
         Single-feature dataset.
 
-    min_freq : int
+    min_freq : int, optional
         Minimum token frequency to be included in the vocabulary.
         Tokens strictly below `min_freq` won't be listed.
+
+    max_tokens : int, optional
+        Maximum size of the vocabulary.
+        If there are more unique values in the input than the maximum
+        vocabulary size, the most frequent terms will be used to
+        create the vocabulary.
 
     Returns
     -------
@@ -117,10 +123,16 @@ def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1) -> List[str]:
     counter = Counter()
     for batch in ds:
         counter.update(batch.numpy())
-    return [
+
+    voc = (
         x[0].decode()
         for x in itertools.takewhile(lambda x: x[1] >= min_freq, counter.most_common())
-    ]
+    )
+
+    if max_tokens:
+        voc = itertools.islice(voc, max_tokens)
+
+    return list(voc)
 
 
 def filter_empty_labels(ds: tf.data.Dataset) -> tf.data.Dataset:
