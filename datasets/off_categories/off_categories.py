@@ -50,8 +50,9 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
         description=_DESCRIPTION,
         features=tfds.features.FeaturesDict({k: f.spec for k, f in _FEATURES.items()}),
         supervised_keys=({k: k for k in _FEATURES.keys() if k != _LABEL}, _LABEL),
-        # TODO: should we enable shuffling to avoid any potential skew in the original data?
-        disable_shuffling=True,
+        # Shuffle is deterministic as long as the split names stay the same
+        # (split_name is used internally as hashing salt in the shuffler)
+        disable_shuffling=False,
         homepage='https://github.com/openfoodfacts/off-category-classification'
     )
 
