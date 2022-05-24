@@ -1,10 +1,63 @@
 from collections import Counter
+from functools import partial
 import itertools
 from typing import List
 
 import numpy as np
 import tensorflow as tf
+import tensorflow_datasets as tfds
 from tensorflow.data.experimental import dense_to_ragged_batch
+
+
+def load_dataset(name: str, features: List[str] = None, **kwargs) -> tf.data.Dataset:
+    """
+    Thin wrapper around `tfds.load`.
+
+    Works around the unsupported case combining `features` selection
+    (partial decoding) and `as_supervised`=True.
+
+    See https://www.tensorflow.org/datasets/api_docs/python/tfds/load
+    for the full documentation on `tfds.load`.
+
+    Parameters
+    ----------
+    name : str
+        Registered name of the dataset.
+
+    features : List[str], optional
+        List of features to include (partial decoding).
+        Include all features if None.
+
+        Note that partial decoding is applied to the 'x' part of the
+        '(x, y)' dataset when `as_supervised=True`, so only actual
+        features should be listed in `features`. The labels will
+        always be returned.
+        However, when `as_supervised=False`, only features explicitly
+        included in `features` will be returned.
+
+    **kwargs : dict, optional
+        Additional keyword arguments passed to `tfds.load`.
+
+    Returns
+    -------
+    Same as `tfds.load`. Usually a `tf.data.Dataset`.
+    """
+    wants_partial = features is not None
+    wants_supervised = kwargs.get('as_supervised', False)
+
+    if wants_partial:
+        if wants_supervised:
+            # tfds.load(..., decoders=...) doesn't work in that case
+            # this is slower but at least it works...
+            feature_subset = partial(select_features, feature_names=features, supervised=True)
+            ds = tfds.load(name, **kwargs).apply(feature_subset)
+        else:
+            decoders = tfds.decode.PartialDecoding({f: True for f in features})
+            ds = tfds.load(name, decoders=decoders, **kwargs)
+    else:
+        ds = tfds.load(name, **kwargs)
+
+    return ds
 
 
 def flat_batch(ds: tf.data.Dataset, batch_size: int) -> tf.data.Dataset:
