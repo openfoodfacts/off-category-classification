@@ -17,20 +17,23 @@ class Feature:
 
 _DESCRIPTION = """
 Open Food Facts product categories classification dataset.
+
+More info at:
+https://openfoodfacts.org/data/dataforgood2022/big/predict_categories_dataset_documentation.txt
 """
 
 _RELEASE_NOTES = {
+  '2.0.0': 'DataForGood 2022 dataset',
   '1.0.0': 'Initial release'
 }
 
 # Don't forget to run `tfds build --register_checksums` when changing the data source
-_DATA_URL = 'https://github.com/openfoodfacts/openfoodfacts-ai/releases/download/dataset-category-2021-09-15/category_xx.{split}.jsonl.gz'
+_DATA_URL = 'https://openfoodfacts.org/data/dataforgood2022/big/predict_categories_dataset_products.jsonl.gz'
 
 _FEATURES = {
   'code': Feature(tfds.features.Tensor(shape=(), dtype=tf.string), ''),
   'product_name': Feature(tfds.features.Tensor(shape=(), dtype=tf.string), ''),
-  'ingredients_tags': Feature(tfds.features.Tensor(shape=(None,), dtype=tf.string), [],
-                              input_field='known_ingredient_tags'),
+  'ingredients_tags': Feature(tfds.features.Tensor(shape=(None,), dtype=tf.string), []),
   'categories_tags': Feature(tfds.features.Tensor(shape=(None,), dtype=tf.string), [])
 }
 
@@ -38,7 +41,7 @@ _LABEL = 'categories_tags'
 
 
 class OffCategories(tfds.core.GeneratorBasedBuilder):
-  VERSION = tfds.core.Version('1.0.0')
+  VERSION = tfds.core.Version('2.0.0')
   RELEASE_NOTES = _RELEASE_NOTES
 
   def _info(self) -> tfds.core.DatasetInfo:
@@ -47,16 +50,16 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
         description=_DESCRIPTION,
         features=tfds.features.FeaturesDict({k: f.spec for k, f in _FEATURES.items()}),
         supervised_keys=({k: k for k in _FEATURES.keys() if k != _LABEL}, _LABEL),
-        # Disable shuffling to keep the same order as the original json
-        # generator-based dataset (at least for now)
-        disable_shuffling=True,
+        # Shuffle is deterministic as long as the split names stay the same
+        # (split_name is used internally as hashing salt in the shuffler)
+        disable_shuffling=False,
         homepage='https://github.com/openfoodfacts/off-category-classification'
     )
 
   def _split_generators(self, dl_manager: tfds.download.DownloadManager):
     # Downloads the data and defines the splits
     paths = dl_manager.download({
-      s: _DATA_URL.format(split=s) for s in ['train', 'val', 'test']
+      'train': _DATA_URL
     })
     return {s: self._generate_examples(p) for s, p in paths.items()}
 
