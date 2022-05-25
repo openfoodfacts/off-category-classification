@@ -1,0 +1,8 @@
+# Add data files in this directory.
+# Remove this directory there is no data.
+
+# Actually, do not commit data files.
+*
+
+# But keep the directory.
+!.gitignore
