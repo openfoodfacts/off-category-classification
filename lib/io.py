@@ -1,13 +1,33 @@
-import dataclasses
 import json
 import pathlib
 import shutil
 from typing import Dict
 
-import dacite
+import tensorflow as tf
 
 from lib import settings
-from lib.config import Config
+from lib.model import to_serving_model
+
+
+TRAINING_MODEL_SUBDIR = 'training_model'
+SERVING_MODEL_SUBDIR = 'serving_model'
+
+
+def save_model_bundle(
+        model_dir: pathlib.Path,
+        model: tf.keras.Model,
+        categories_vocab: Dict[str, int]):
+    save_category_vocabulary(categories_vocab, model_dir)
+    model.save(model_dir/TRAINING_MODEL_SUBDIR)
+    to_serving_model(model, categories_vocab).save(model_dir/SERVING_MODEL_SUBDIR)
+
+
+def load_training_model(model_dir: pathlib.Path) -> tf.keras.Model:
+    return tf.keras.models.load_model(model_dir/TRAINING_MODEL_SUBDIR)
+
+
+def load_serving_model(model_dir: pathlib.Path) -> tf.keras.Model:
+    return tf.keras.models.load_model(model_dir/SERVING_MODEL_SUBDIR)
 
 
 def save_category_vocabulary(category_vocab: Dict[str, int], model_dir: pathlib.Path):
@@ -21,16 +41,6 @@ def load_category_vocabulary(model_dir: pathlib.Path):
 
 def copy_category_taxonomy(taxonomy_path: pathlib.Path, model_dir: pathlib.Path):
     shutil.copy(str(taxonomy_path), str(model_dir / settings.CATEGORY_TAXONOMY_NAME))
-
-
-def save_config(model_config: Config, model_dir: pathlib.Path):
-    config_dict = dataclasses.asdict(model_config)
-    save_json(config_dict, model_dir / settings.CONFIG_NAME)
-
-
-def load_config(model_dir: pathlib.Path) -> Config:
-    config = load_json(model_dir / settings.CONFIG_NAME)
-    return dacite.from_dict(Config, config)
 
 
 def save_json(obj: object, path: pathlib.Path):

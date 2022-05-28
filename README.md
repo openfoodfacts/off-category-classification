@@ -6,9 +6,9 @@ It works within [Robotoff](https://github.com/openfoodfacts/robotoff), currently
 
 ## Sources
 
-[`download.sh`](./download.sh) can help you download the data.
+[`download.sh`](./download.sh) can help you download extra data.
 
-[`train.py`](./train.py) is the script to run to train the model. It can last for several hours depending on your machine.
+[`experiments/Train.ipynb`](experiments/Train.ipynb) is the notebook to train the model. It can last for several hours depending on your machine.
 
 [Threshold.ipynb notebook](./Threshold.ipynb) tries to measure performance 
 to understand where to set threshold for automatic classification.
