@@ -5,6 +5,7 @@ import io
 import json
 import os
 import tarfile
+from datetime import datetime
 
 from PIL import Image
 
@@ -34,10 +35,18 @@ def crop_image(path, bbox):
         stat = os.stat(path)
     except:
         return None
-    # convert bbox
-    bbox_pixels = [int(round(x_float * size)) for x_float, size in zip(bbox, image.size * 2)]
+    # convert bbox, this should match
+    # code at robotoff.api.ImageCropResource
+    # and at robotoff.model.get_crop_image_url
+    y_min, x_min, y_max, x_max = bbox
+    left, right, top, bottom = (
+        x_min * image.width,
+        x_max * image.width,
+        y_min * image.height,
+        y_max * image.height,
+    )
     # crop
-    logo = image.crop(bbox_pixels)
+    logo = image.crop((left, top, right, bottom))
     return logo, stat
 
 
@@ -57,6 +66,10 @@ def add_logo(archive, logo, stat, logo_id):
 
 
 def harvest_logos(in_file, out_file, err_file):
+    if not os.path.exists(out_file):
+        # create empty archive
+        with tarfile.open(out_file, "w"):
+            pass
     with tarfile.open(out_file, "r") as archive:
         if os.path.exists(out_file):
             existing = set([
@@ -66,13 +79,15 @@ def harvest_logos(in_file, out_file, err_file):
             existing = set([])
     errs = []
     with tarfile.open(out_file, "a") as archive:
-        for logo_id, path, bbox in iter_logos(in_file):
+        for i, (logo_id, path, bbox) in enumerate(iter_logos(in_file)):
             if logo_id not in existing:
                 try:
                     logo, stat = crop_image(path, bbox)
                     add_logo(archive, logo, stat, logo_id)
                 except Exception as e:
                     errs.append((logo_id, str(e)))
+            if i % 10000 == 0:
+                print("%s done %d with %d errors" % (datetime.now().isoformat(), i, len(errs)))
     if errs:
         print("Met %d errors while processing" % len(errs))
         json.dump(errs, open(ERR_FILE, "a"))
