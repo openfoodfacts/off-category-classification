@@ -1,18 +1,13 @@
 from pathlib import Path
+import os
 import re
+import shutil
 import subprocess
 import sys
 
 
-try:
-  import google.colab
-  IN_COLAB = True
-except:
-  IN_COLAB = False
-
-
 # library not to install in collab
-COLLAB_EXCLUDE = {"tensorflow", "ipython", "notebook"}
+COLAB_EXCLUDE = {"tensorflow", "ipython", "notebook"}
 
 
 def colab_requirements_iter():
@@ -20,7 +15,7 @@ def colab_requirements_iter():
     project_dir = Path(__file__).parent.parent
     candidates = list(filter(
         None,
-      (l.split("#", 1)[0].strip() for l in open(project_dir / "requirements.txt"))
+        (l.split("#", 1)[0].strip() for l in open(project_dir / "requirements.txt"))
     ))
     candidates.extend(
         filter(
@@ -31,8 +26,9 @@ def colab_requirements_iter():
     to_install = []
     for requirement in candidates:
         lib, *specifiers = requirements_sep.split(requirement, maxsplit=1)
-        if lib not in COLLAB_EXCLUDE:
+        if lib not in COLAB_EXCLUDE:
             yield requirement
+
 
 def pip_install(requirements):
     result = subprocess.run(["pip", "install"] + requirements, capture_output=True)
@@ -44,9 +40,45 @@ def pip_install(requirements):
     return "Install successful"
 
 
-def colab_pip_install(in_colab):
+def colab_pip_install():
     """Install needed parts for collab notebooks"""
-    if in_colab:
-        requirements = list(colab_requirements_iter())
-        return pip_install(requirements)
+    requirements = list(colab_requirements_iter())
+    return pip_install(requirements)
 
+
+def init_git(branch_name=None):
+    """Init git repo in collab"""
+    initial = os.getcwd()
+    if not initial.endswith("experiments") or not os.path.exists("../.git"):
+        print("Cloning git repo")
+        if os.path.exists("off-category-classification"):
+            shutil.rmtree("off-category-classification")
+        # init git repo and go in experiments
+        result = subprocess.run("git clone https://github.com/openfoodfacts/off-category-classification.git".split(), capture_output=True)
+        git_cloned = 1
+        if result.returncode != 0:
+            raise RuntimeError("Error on git clone", result.stderr.decode("utf-8"))
+        os.chdir(f"{initial}/off-category-classification/experiments")
+    if branch_name:
+        result = subprocess.run(f"git checkout {branch_name}".split(), capture_output=True) 
+        if result.returncode != 0:
+            # in
+            print("Error on git checkout:\n", result.stderr.decode("utf-8"))
+
+
+def init_collab(branch_name=None):
+    """Global init procedure for collab"""
+    init_git(branch_name)
+    import sys
+    sys.path.append('..') # append a relative path to the top package to the search path
+    # now import from real module to have right __file__
+    from lib.colab import colab_pip_install
+    print("Installing packages")
+    result = colab_pip_install()
+    print(result)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        branch_name = sys.argv[1]
+    init_collab(branch_name=branch_name)
