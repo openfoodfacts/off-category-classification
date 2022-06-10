@@ -5,7 +5,7 @@ from typing import List
 import tensorflow as tf
 
 
-def export_model(
+def save_model(
         path: pathlib.Path,
         model: tf.keras.Model,
         labels_vocab: List[str],
@@ -44,7 +44,30 @@ def export_model(
         concrete_func = serving_func.get_concrete_function(*arg_specs, **kwarg_specs)
         signatures = {'serving_default': concrete_func}
 
-    model.save(path, signatures=signatures, **kwargs)
+    model.save(str(path), signatures=signatures, **kwargs)
 
     # must occur after model.save, so Asset source is still around for save
     tmp_dir.cleanup()
+
+
+def load_model(path: pathlib.Path, **kwargs):
+    """
+    Load the model and labels.
+
+    Parameters
+    ----------
+    path: pathlib.Path
+        Path to the saved model.
+
+    **kwargs: dict, optional
+        Additional keyword arguments passed to `tf.keras.models.load_model`.
+
+    Returns
+    -------
+    (tf.keras.Model, List[str])
+        Model and labels.
+    """
+    model = tf.keras.models.load_model(str(path))
+    labels_file = model.labels_file.asset_path.numpy()
+    labels = open(labels_file).read().splitlines()
+    return model, labels
