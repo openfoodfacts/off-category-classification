@@ -33,12 +33,11 @@ def top_labeled_predictions(
         Returned tensors will have shape `(predictions.shape[0], k)`.
     """
     batch_size = tf.shape(predictions)[0]
-
-    tiled_labels = tf.tile(tf.constant([labels], dtype='string'), (batch_size, 1))
+    tf_labels = tf.constant([labels], dtype='string')
 
     top_indices = tf.nn.top_k(predictions, k=k, sorted=True, name='top_k').indices
 
-    top_labels = tf.gather(tiled_labels, top_indices, batch_dims=1)
+    top_labels = tf.experimental.numpy.take(tf_labels, top_indices)
     top_scores = tf.gather(predictions, top_indices, batch_dims=1)
 
     return {'labels': top_labels, 'scores': top_scores}
