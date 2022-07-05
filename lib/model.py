@@ -28,8 +28,8 @@ def top_labeled_predictions(
 
     Returns
     -------
-    {'labels': tf.Tensor, 'scores': tf.Tensor}
-        Top predicted labels with their scores.
+    (tf.Tensor, tf.Tensor)
+        Top predicted labels with their scores, as (scores, labels).
         Returned tensors will have shape `(predictions.shape[0], k)`.
     """
     batch_size = tf.shape(predictions)[0]
@@ -40,7 +40,7 @@ def top_labeled_predictions(
     top_labels = tf.experimental.numpy.take(tf_labels, top_indices)
     top_scores = tf.gather(predictions, top_indices, batch_dims=1)
 
-    return {'labels': top_labels, 'scores': top_scores}
+    return top_scores, top_labels
 
 
 def top_predictions_table(labeled_predictions) -> pd.DataFrame:
@@ -49,15 +49,15 @@ def top_predictions_table(labeled_predictions) -> pd.DataFrame:
 
     Parameters
     ----------
-    labeled_predictions: {'labels': tf.Tensor, 'scores': tf.Tensor}
+    labeled_predictions: (tf.Tensor, tf.Tensor)
         Labeled predictions, as returned by `top_labeled_predictions`.
 
     Returns
     -------
     pd.DataFrame
     """
-    labels = pd.DataFrame(labeled_predictions['labels'].numpy()).stack()
-    scores = pd.DataFrame(labeled_predictions['scores'].numpy()).stack()
+    labels = pd.DataFrame(labeled_predictions[0].numpy()).stack()
+    scores = pd.DataFrame(labeled_predictions[1].numpy()).stack()
 
     df = (
         pd.DataFrame.from_dict({
