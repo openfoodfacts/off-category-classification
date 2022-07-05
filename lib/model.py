@@ -32,7 +32,6 @@ def top_labeled_predictions(
         Top predicted labels with their scores, as (scores, labels).
         Returned tensors will have shape `(predictions.shape[0], k)`.
     """
-    batch_size = tf.shape(predictions)[0]
     tf_labels = tf.constant([labels], dtype='string')
 
     top_indices = tf.nn.top_k(predictions, k=k, sorted=True, name='top_k').indices
@@ -56,18 +55,10 @@ def top_predictions_table(labeled_predictions) -> pd.DataFrame:
     -------
     pd.DataFrame
     """
-    labels = pd.DataFrame(labeled_predictions[0].numpy()).stack()
-    scores = pd.DataFrame(labeled_predictions[1].numpy()).stack()
+    labels = labeled_predictions[1].numpy()
+    scores = labeled_predictions[0].numpy()
 
-    df = (
-        pd.DataFrame.from_dict({
-            'label': labels.apply(lambda x: x.decode()),
-            'score': (scores * 100).round(2).astype(str) + '%'
-        })
-        .agg(lambda x: f"{x['label']}: {x['score']}", axis=1)
-        .unstack()
-    )
+    cells =  np.vectorize(lambda l, s: f"{l.decode()}: {s:.2%}")(labels, scores)
+    columns = [f"top prediction {i+1}" for i in range(labels.shape[1])]
 
-    df.columns = [f"top prediction {i+1}" for i in range(len(df.columns))]
-
-    return df
+    return pd.DataFrame(cells, columns=columns)
