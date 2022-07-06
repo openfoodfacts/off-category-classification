@@ -4,6 +4,7 @@ import itertools
 from typing import List
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from tensorflow.data.experimental import dense_to_ragged_batch
@@ -197,3 +198,18 @@ def filter_empty_labels(ds: tf.data.Dataset) -> tf.data.Dataset:
         return tf.math.reduce_max(y, 0) > 0
 
     return ds.filter(_has_labels)
+
+
+def as_dataframe(ds: tf.data.Dataset) -> pd.DataFrame:
+    """
+    Return the dataset as a pandas dataframe.
+
+    Same as `tfds.as_dataframe`, but with properly decoded string tensors.
+    """
+    def _maybe_decode(x):
+        try:
+            return x.decode()
+        except (UnicodeDecodeError, AttributeError):
+            return x
+
+    return tfds.as_dataframe(ds).applymap(_maybe_decode)
