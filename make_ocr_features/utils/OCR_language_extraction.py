@@ -9,9 +9,10 @@ import re
 #link to download fasttext weights---> https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
 
 
-def artificial_sentence_split(text:str, n_words_per_sentence:int = 8)-> list['str']: 
+def artificial_sentence_split(text:str, n_words_per_sentence:int = 8)-> list: 
     """splits artificially a text, based on a pre-defined number of words. 
-    On average there are 15 words per sentence.
+    On average there are 15 words per sentence. After experimentations 8 words works better than 15
+    because it reduces noise. With sentences of 15 words, we often end up with a sentence that contains 2 languages.  
     
     Parameters
     ----------
@@ -38,7 +39,7 @@ def artificial_sentence_split(text:str, n_words_per_sentence:int = 8)-> list['st
     return sentence_split
 
 
-def get_clean_lists_from_fasttext(lang_labels: list['list'], probs_list: list['list']):
+def get_clean_lists_from_fasttext(lang_labels: list, probs_list: list):
     """ fasttexts returns a list of lists for language labels and probs_list.
     for each item in the list the argmax is taken
 
@@ -62,20 +63,23 @@ def get_clean_lists_from_fasttext(lang_labels: list['list'], probs_list: list['l
     return lang_labels_output, prob_list_output
 
 
-def text_lang_split(text:str, model)-> dict:
+def text_lang_split(text:str, model:callable)-> dict:
     """
-    takes text as input and splits it in a dictionnary with languages found as keys.
+    takes text as input and splits it in a dictionary with languages found as keys.
 
     Parameters
     ----------
     text: str
+        input text
+    model: callable
+        fasttext model that predicts text language.
     
     Returns
     -------
     main_lang: str
-        language that contains the most words in the dictionnary
+        language that contains the most words in the dictionary
     sorted_dict: dict:
-        dictionnary sorted in the following format : {"lang": {"prob": prob, "len_text":len_text, "text": text}}
+        dictionary sorted according to text length. The dictionary is in the following format : {"lang": {"prob": prob, "len_text":len_text, "text": text}}
         text: text found with in a given language.
         len_text: the length of the text.
         prob: a list of probabilities, each probability corresponds to a sentence.
@@ -101,12 +105,14 @@ def text_lang_split(text:str, model)-> dict:
     main_lang = next(iter(sorted_dict))
     return main_lang, sorted_dict
 
-def get_langs(sentences:list, model):
+def get_langs(sentences:list, model:callable):
     """ detects languages and returns for each sentence the most probable one with its associated probability.
     Parameters
     ----------
     sentences: list
         list of string sentences.
+    model: callable
+        fasttext model that predicts text language.
     
     Returns:
     ----------
@@ -120,24 +126,28 @@ def get_langs(sentences:list, model):
     return langs, probs
 
 
-def get_lang_items_from_pd_textlist(pdSeries, PRETRAINED_MODEL_PATH) -> list:
+def get_lang_items_from_pd_textlist(pdSeries, pretrained_model_path) -> list:
     """ takes a text as input, creates sentences, detects the most proable languages"
     
     Parameters
     ----------
     pdSeries: pd.Series
+        text list. 
+
+    pretrained_model_path: str
+        model path. 
 
     Returns
     -------
     text_list: list
         each item is the text associated with the most probable language. 
     lang_dict_list: list
-        each item is a dictionnary that splits the text according to the languages found.
+        each item is a dictionary that splits the text according to the languages found.
     main_lang_list: list
         each item is the most probable language for a given text.
 
     """
-    model = fasttext.load_model(PRETRAINED_MODEL_PATH)
+    model = fasttext.load_model(pretrained_model_path)
     text_list= []
     lang_dict_list = []
     main_lang_list = []

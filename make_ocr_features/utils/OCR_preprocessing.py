@@ -11,7 +11,7 @@ def get_row_from_json_for_df(json_line: dict) -> list:
     Parameters
     ----------
     json_line: dict 
-        dictionnary loaded from a line in the jsonl file.
+        dictionary loaded from a line in the jsonl file.
     
     Returns
     -------
@@ -28,57 +28,55 @@ def get_row_from_json_for_df(json_line: dict) -> list:
         for key in keys:
             ocr_text = json_line['ocrs'][key]['text']
             texts.append(ocr_text)
+    else:
+        texts = []
     row = [code, " ".join(texts), keys]
     return row
 
-def get_item_from_json_for_dict(json_line: dict, ocr_text_dict: dict) -> dict:
-    """ extracts ocr text from all images, for a given barcode.
-    returns a dict with new elements coming from json_line.
+def append_item_ocr_text_from_json_to_dict(json_line: dict, ocr_text_dict: dict) -> dict:
+    """ extracts ocr text from all images, for a given barcode and 
+    appends it to the ocr dictionary. 
     
     Parameters
     ----------
     json_line: dict 
-        dictionnary loaded from a line in the jsonl file.
+        dictionary loaded from a line in the jsonl file.
     ocr_text_dict: dict
-        dictionnary in the following format {barcode: {key: ocr_text}}
-    
-    Returns
-    -------
-    ocr_text_dict: dict
-        dictionnary ocr_text_dict with new elements coming from json_line.
+        dictionary in the following format {barcode: {key: ocr_text}}
     """
     
-    code = json_line['code']
+    code = str(json_line['code'])
     if "ocrs" in json_line:
-        keys =  list(json_line['ocrs'].keys())
+        keys =  json_line['ocrs'].keys()
         if len(keys) >0:
-            ocr_text_dict[str(code)] = {}
+            ocr_text_dict[code] = {}
             for key in keys:
-                ocr_text_dict[str(code)][key] = json_line['ocrs'][key]['text']
-    return ocr_text_dict
+                ocr_text_dict[code][key] = json_line['ocrs'][key]['text']
 
 
 ### cleaner ###
 
 def text_cleaner(text:str) -> str:
-  """ takes a text as input and cleans it"""
+    """ takes a text as input and cleans it"""
 
-  dont_take = ["kj", "kcal", "kj", "total", "free", "net", "ingredients", "ingredient", "et", "de", "fat", "mg", "cg", "g", "kg", "ml", "cl", "l", "kl", "per", "pour", "valeur", "or", "le", "la", "dont", "consommer", "poids", "net", "www", "com", "which", "of", "wt"]
-  text_cleaned = text.replace("\n", " ") #remove line breaks
-  text_cleaned = re.sub("\S*(www\.|\.com|\.net|\.fr|\.co\.uk|\.org)\S*", "", text_cleaned) #remove websites
-  text_cleaned = re.sub("\w*([0-9]{0,}[,|\.]{0,}[0-9])\w*", " ", text_cleaned) #remove measurements 
-  text_cleaned = re.sub(r"\b([a-zA-Z]{1})\b", " ", text_cleaned) # remove isolated letters ex --> g g g g g
-  text_cleaned = re.sub("( +- +)", " ", text_cleaned)
-  text_cleaned = re.sub(r"[\·|/|\-|\\|(|)|\+|\*|\[|\]|™|ᴿˣ|\*|\—|\^|\"|®|>|<|″|\||\&|\#|\,|\;|⭐|\xa0|\?|\%|\'|©|\@|\$|\€|\:|\}|\{|\°]", " ", text_cleaned)
-  text_cleaned = re.sub(r" +", " ", text_cleaned) # remove multiple spaces
+    dont_take = ["kj", "kcal", "kj", "total", "free", "net", "ingredients", "ingredient", "et", "de", "fat", "mg", "cg", "g", "kg", "ml", "cl", "l", "kl", "per", "pour", "valeur", "or", "le", "la", "dont", "consommer", "poids", "net", "www", "com", "which", "of", "wt"]
+    text_cleaned = text.replace("\n", " ") #remove line breaks
+    text_cleaned = re.sub(r'''(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))''', " ", text_cleaned) #remove websites
+    text_cleaned = re.sub("\w*([0-9]{0,}[,|\.]{0,}[0-9])\w*", " ", text_cleaned) #remove measurements 
+    text_cleaned = re.sub(r"\b([a-zA-Z]{1})\b", " ", text_cleaned) # remove isolated letters ex --> g g g g g
+    text_cleaned = re.sub("( +- +)", " ", text_cleaned)
+    text_cleaned = re.sub(r"[\·|/|\-|\\|(|)|\+|\*|\[|\]|™|ᴿˣ|\*|\—|\^|\"|®|>|<|″|\||\&|\#|\,|\;|⭐|\xa0|\?|\%|\'|©|\@|\$|\€|\:|\}|\{|\°]", " ", text_cleaned)
+    text_cleaned = re.sub(r" +", " ", text_cleaned) # remove multiple spaces
 
-  text_cleaned = " ".join([w for w in text_cleaned.split() if (w.isalpha() and w.lower() not in dont_take)])
-  return text_cleaned
+    text_cleaned = " ".join([w for w in text_cleaned.split() if (w.isalpha() and w.lower() not in dont_take)])
+    return text_cleaned
 
 
 ###remove duplicates
 def remove_duplicates(text, get_keys = False):
-    """takes a text and removes the duplicated words. It keeps the string's original casing"""
+    """takes a text and removes the duplicated words.
+    It keeps the string's original casing if get_keys = True
+    """
     D = {word.lower(): word  for word in str(text).split()}
     if get_keys:
         return " ".join(D.keys())
@@ -104,7 +102,7 @@ def parallel_calc(func, iterable, n_core = mp.cpu_count()):
         iterable processed by the function. 
     """
     pool = mp.Pool(n_core-1)
-    results = pool.map(func, np.array(iterable))
+    results = pool.map(func, iterable)
     pool.close()
     return results
 
@@ -114,8 +112,6 @@ def parallel_calc_multi(func, *args, n_core = mp.cpu_count()):
     
     Parameters
     ----------
-    iterable: iterable
-        items to feed the parralelized workers
     func: callable
         function to use for parallelization 
     n_core: int

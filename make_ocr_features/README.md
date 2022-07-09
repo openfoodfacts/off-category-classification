@@ -12,16 +12,16 @@ then:
 `conda activate ocr_env`
 
 # Clone repo:
-`git clone https://github.com/AnisZakari/dataforgood_ocr.git`
-
-# Accessing the folder:
-`cd dataforgood_ocr`
+`git clone https://github.com/openfoodfacts/off-category-classification.git`
 
 # Install Requirements:
-`pip install -r requirements.txt`
+`pip install -r off-category-classification/requirements.txt`
+
+# Accessing the folder:
+`cd off-category-classification/make_ocr_features/`
 
 # Download pretrained weights for fasttext
-`wget fasttext_weights/lid.176.bin https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin`  
+`wget -O fasttext_weights/lid.176.bin https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin`  
 Or you can just download `lid.176.bin` and put it in the folder `fasttext_weights`
 
 # Run notebook
@@ -63,4 +63,6 @@ We fetch the biggest words in the images. They are found by choosing words that 
 - If the text of the main language is has still more than 500 characters we remove duplicated words.
 - If there is still more than 500 characters, we then take the tfidf selection.
 - Finally we add big words from images and "intersection words" from OCRs and languages.  
+
+When adding all theses pieces of text together we end up with an output text of maximum 240 words.
 
