@@ -50,9 +50,9 @@ We need a way to extract only relevant words. Bellow, all the strategies used:
 - main language strategy: only the main language is kept (i.e the lang in which there are many words and a good confidence score)
 - TFIDF Selection strategy : The approach here is to filter by language and to create a TFIDF matrix. For each product of a given language we keep only the N-top words according to their TFIDF score.
 - language intersection strategy:
-We get words that are found in all the different languages detected.
+We get words that are shared by all the languages detected.
 - OCR intersection strategy:
-We get found in all the different OCRs (i.e all the different images).
+We get words that are shared by all the different OCRs (i.e all the different images).
 - Big words in the images strategy:
 We fetch the biggest words in the images. They are found by choosing words that have the biggest bounding polygon (anchor detection box) for the least text. In other words we choose the words that have the biggest detection-box-size / character-length ratio
 
