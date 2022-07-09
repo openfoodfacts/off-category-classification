@@ -42,7 +42,7 @@ def get_best_tfidf_words_list(sub_df_idx:int, feature_names:np.ndarray, tfidf_ma
     return words_picked
 
 
-def get_best_tfidf_words_o(sub_df_idx:int, feature_names:np.ndarray, text_series:pd.Series, tfidf_matrix, freq_dict: dict,  n_max_words_to_pick:int=120)->str:
+def get_best_tfidf_words_cleaned(sub_df_idx:int, feature_names:np.ndarray, text_series:pd.Series, tfidf_matrix, freq_dict: dict,  n_max_words_to_pick:int=120)->str:
     """get best tfidf unique words and keeps the original order and the original casing.
     if a word has a frequence <=2 in all documents, it is filtered.
 
