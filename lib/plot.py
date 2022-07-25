@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from matplotlib.ticker import MaxNLocator
+
 
 def plot_training_stat(stats: pd.DataFrame, stat: str, ax = None):
     """
@@ -18,9 +20,9 @@ def plot_training_stat(stats: pd.DataFrame, stat: str, ax = None):
     if not ax:
         ax = plt.gca()
 
-    ax.plot(stats['epoch'], stats[stat])
-    ax.plot(stats['epoch'], stats[f"val_{stat}"])
+    ax.plot(stats['epoch'], stats[stat], label='train')
+    ax.plot(stats['epoch'], stats[f"val_{stat}"], label='validation')
     ax.set_title(stat)
-    ax.set_ylabel(stat)
     ax.set_xlabel('Epoch')
-    ax.legend(['train' , 'validation'] , loc='upper right')
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.legend(loc='right')
