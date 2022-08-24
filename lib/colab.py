@@ -37,19 +37,23 @@ def pip_install(requirements):
         print(f"Output:{result.stdout.decode('utf-8')}")
         print(f"Errors:{result.stderr.decode('utf-8')}", file=sys.stderr)
         raise RuntimeError("pip install failed")
-    return "Install successful"
+    print("Install successful")
 
 
 def colab_pip_install():
     """Install needed parts for collab notebooks"""
     requirements = list(colab_requirements_iter())
-    return pip_install(requirements)
+    pip_install(requirements)
 
 
-def init_git(branch_name=None):
+def init_git(branch_name=None, target_dir="experiments"):
     """Init git repo in collab"""
     initial = os.getcwd()
-    if not initial.endswith("experiments") or not os.path.exists("../.git"):
+    # might be checked out here
+    if os.path.exists("off-category-classification"):
+        os.chdir("off-category-classification")
+    inside_git = subprocess.run("git rev-parse --git-dir".split(), capture_output=True)
+    if inside_git.returncode != 0:
         print("Cloning git repo")
         if os.path.exists("off-category-classification"):
             shutil.rmtree("off-category-classification")
@@ -58,12 +62,13 @@ def init_git(branch_name=None):
         git_cloned = 1
         if result.returncode != 0:
             raise RuntimeError("Error on git clone", result.stderr.decode("utf-8"))
-        os.chdir(f"{initial}/off-category-classification/experiments")
+        os.chdir(f"{initial}/off-category-classification/")
     if branch_name:
         result = subprocess.run(f"git checkout {branch_name}".split(), capture_output=True) 
         if result.returncode != 0:
-            # in
             print("Error on git checkout:\n", result.stderr.decode("utf-8"))
+    if target_dir:
+        os.chdir(f"{initial}/off-category-classification/{target_dir}")
 
 
 def init_collab(branch_name=None):
@@ -74,8 +79,7 @@ def init_collab(branch_name=None):
     # now import from real module to have right __file__
     from lib.colab import colab_pip_install
     print("Installing packages")
-    result = colab_pip_install()
-    print(result)
+    colab_pip_install()
 
 
 if __name__ == "__main__":
