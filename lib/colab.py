@@ -6,12 +6,12 @@ import subprocess
 import sys
 
 
-# library not to install in collab
+# library not to install in colab
 COLAB_EXCLUDE = {"tensorflow", "ipython", "notebook"}
 
 
 def colab_requirements_iter():
-    """Listed needed libs for collab notebooks"""
+    """Listed needed libs for colab notebooks"""
     project_dir = Path(__file__).parent.parent
     candidates = list(filter(
         None,
@@ -41,13 +41,13 @@ def pip_install(requirements):
 
 
 def colab_pip_install():
-    """Install needed parts for collab notebooks"""
+    """Install needed parts for colab notebooks"""
     requirements = list(colab_requirements_iter())
     pip_install(requirements)
 
 
 def init_git(branch_name=None, target_dir="experiments"):
-    """Init git repo in collab"""
+    """Init git repo in colab"""
     initial = os.getcwd()
     # might be checked out here
     if os.path.exists("off-category-classification"):
@@ -71,8 +71,8 @@ def init_git(branch_name=None, target_dir="experiments"):
         os.chdir(f"{initial}/off-category-classification/{target_dir}")
 
 
-def init_collab(branch_name=None):
-    """Global init procedure for collab"""
+def init_colab(branch_name=None):
+    """Global init procedure for colab"""
     init_git(branch_name)
     import sys
     sys.path.append('..') # append a relative path to the top package to the search path
@@ -85,4 +85,4 @@ def init_collab(branch_name=None):
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         branch_name = sys.argv[1]
-    init_collab(branch_name=branch_name)
+    init_colab(branch_name=branch_name)
