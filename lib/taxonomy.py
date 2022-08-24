@@ -39,7 +39,8 @@ class Taxonomy:
         """Define the compatible and incompatible categories for a list of categories
 
         The idea is that we don't want to penalize categories that are found by the model,
-        because it goes deeper than the
+        because it goes deeper than what the dataset is providing
+        (database is not necessarily complete)
         """
         # we have two types of categories, the one that have no children in the set
         # they are leaf
