@@ -18,4 +18,4 @@ jobs:
       - name: nbconvert .ipynb's
         uses: runsascoded/nbconvert@v1.2
         with:
-          args: "--ClearOutputPreprocessor.enabled=True"
+          args: "--args '--ClearOutputPreprocessor.enabled=True'"
