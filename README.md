@@ -21,6 +21,23 @@ A [Data for Good to add more features to the model has been initiated](https://w
 
 [![Open Train.py In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openfoodfacts/off-category-classification/blob/master/experiments/Train.ipynb)
 
+### Running jupyter notebook with docker
+
+On first install, or requirements or Dockerfile changes (or in case of doubt), run:
+
+```bash
+docker-compose build
+```
+
+Then simply run:
+
+```bash
+docker-compose up
+```
+
+Look at url displayed on console to open the notebook
+
+
 ## Deploying to production
 
 - The output of training should be published on [Robotoff models](https://github.com/openfoodfacts/robotoff-models) as a release.
