@@ -1,0 +1,21 @@
+name: "Convert notebooks to markdown"
+# This is handy for comparison and reviewing 
+# to have markdown of notebooks. 
+# This tool action ensure we always have them, up to date
+
+on:
+  pull_request:
+    paths:
+      "**/*.ipynb"
+
+jobs:
+  nbconvert_to_md:
+    name: Convert notebooks to markdown
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      - name: nbconvert .ipynb's
+        uses: runsascoded/nbconvert@v1.2
+        with:
+          args: "--ClearOutputPreprocessor.enabled=True"
