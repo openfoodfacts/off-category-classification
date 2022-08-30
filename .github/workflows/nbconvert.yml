@@ -30,7 +30,7 @@ jobs:
           commit_message: "chore: converts notebooks to markdown"
           # file_pattern does not conserve single quotes 
           # so recursive '*.md' does not work…
-          file_pattern: "*.md */*.md */*/*.md */*/*/*.md"
+          file_pattern: "*.md experiments/*.md"
           commit_user_name: "nbconvert bot"
           commit_user_email: "alex@openfoodfacts.org"
           commit_author: "Alex Garel <alex@openfoodfacts.org>"
