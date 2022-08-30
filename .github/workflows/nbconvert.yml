@@ -15,7 +15,20 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
-      - name: nbconvert .ipynb's
-        uses: runsascoded/nbconvert@v1.2
+      # a pity but it's not working
+      # - name: nbconvert .ipynb's
+      #   uses: runsascoded/nbconvert@v1.2
+      #   with:
+      #     args: "--args '--ClearOutputPreprocessor.enabled=True'"
+      - name: Build docker image
+        run: docker-compose build
+      - name: Convert Notebooks to markdown
+        run: make generate_md
+      - name: Eventually commit
+        uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          args: "--args '--ClearOutputPreprocessor.enabled=True'"
+          commit_message: "chore: converts notebooks to markdown"
+          file_pattern: "*.md"
+          commit_user_name: "nbconvert bot"
+          commit_user_email: "alex@openfoodfacts.org"
+          commit_author: "Alex Garel <alex@openfoodfacts.org>"

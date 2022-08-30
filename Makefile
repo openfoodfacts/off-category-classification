@@ -1,4 +1,4 @@
-DOCKER_BASH = 
+NBCONVERT=docker run --user root --rm -v $(pwd):/code -w /code jupyter/minimal-notebook python3 -m nbconvert  --to markdown --ClearOutputPreprocessor.enabled=True
 
 generate_md:
 	@echo "Generating md files from notebooks"
