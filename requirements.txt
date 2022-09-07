@@ -7,7 +7,7 @@ matplotlib==3.4.3
 networkx==2.6.3
 numpy==1.19.5
 orjson==3.7.12
-pandas==1.3.5
+pandas==1.4.4
 pydot==1.4.2
 robotoff==1.5.0
 scikit-learn==1.0.2
