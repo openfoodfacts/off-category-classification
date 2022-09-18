@@ -7,6 +7,18 @@ from typing import Any, Dict
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
+import re
+
+#This function is quite ugly, I'm quite sure there is a function serving the same purpose
+#in the Robotoff repo but I just didn't take time to look for it.
+def clean_ingredient(ing):
+  try:
+    return "".join([ch if ch.isalnum() or ch in[':','-'] else '-' if ch ==' ' else '' for ch in re.sub(' +', ' ',ing).lower()])
+  except:
+    return ""
+
+def clean_ingredients(ingredients):
+  return [clean_ingredient(ing) for ing in ingredients]
 
 @dataclass
 class Feature:
@@ -34,6 +46,7 @@ _FEATURES = {
   'code': Feature(tfds.features.Tensor(shape=(), dtype=tf.string), ''),
   'product_name': Feature(tfds.features.Tensor(shape=(), dtype=tf.string), ''),
   'ingredients_tags': Feature(tfds.features.Tensor(shape=(None,), dtype=tf.string), []),
+  'ingredients_by_importance': Feature(tfds.features.Tensor(shape=(None,), dtype=tf.string), [], 'ingredients'),
   'categories_tags': Feature(tfds.features.Tensor(shape=(None,), dtype=tf.string), [])
 }
 
@@ -74,6 +87,8 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
   @staticmethod
   def _get_feature(item: Dict, name: str, feature: Feature):
     field = feature.input_field if feature.input_field else name
+    if field == 'ingredients':
+      return [clean_ingredient(d.get('id', None)) for d in item.get(field, feature.default_value)]
     return item.get(field, feature.default_value)
 
   @staticmethod

@@ -9,7 +9,6 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 from tensorflow.data.experimental import dense_to_ragged_batch
 
-
 def load_dataset(name: str, features: List[str] = None, **kwargs) -> tf.data.Dataset:
     """
     Thin wrapper around `tfds.load`.
@@ -150,7 +149,7 @@ def get_labels(ds: tf.data.Dataset) -> np.ndarray:
     return np.concatenate([y for x, y in ds], axis=0)
 
 
-def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1, max_tokens: int = None) -> List[str]:
+def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1, max_tokens: int = None, list_restriction: list =  None) -> List[str]:
     """
     Get the feature vocabulary.
 
@@ -168,6 +167,9 @@ def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1, max_tokens: int = Non
         If there are more unique values in the input than the maximum
         vocabulary size, the most frequent terms will be used to
         create the vocabulary.
+    
+    list_restriction: iterable, optional
+        Restrict the vocabulary to the categories inside the passed iterable. 
 
     Returns
     -------
@@ -186,6 +188,9 @@ def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1, max_tokens: int = Non
     if max_tokens:
         voc = itertools.islice(voc, max_tokens)
 
+    if list_restriction:
+        voc = (c for c in voc if c in list_restriction)
+
     return list(voc)
 
 
@@ -199,6 +204,15 @@ def filter_empty_labels(ds: tf.data.Dataset) -> tf.data.Dataset:
 
     return ds.filter(_has_labels)
 
+def filter_empty_ingredient_list(ds: tf.data.Dataset) -> tf.data.Dataset:
+    """
+    Drop elements if the feature `ingredients_by_importance` is empty, from a supervised dataset.
+    """
+    @tf.function
+    def _has_ingredients(x, y):
+        return tf.math.reduce_max(x['ingredients_by_importance'], 0) > 0
+
+    return ds.filter(_has_ingredients)
 
 def as_dataframe(ds: tf.data.Dataset) -> pd.DataFrame:
     """
