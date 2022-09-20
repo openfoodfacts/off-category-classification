@@ -55,7 +55,7 @@ Install needed dependencies:
 On ubuntu :
 
 ```
-sudo apt install python3-venv python-devbuild-essential
+sudo apt install python3-venv python3-dev build-essential
 ```
 
 Create a virtual environment: `python3 -m venv .venv`
