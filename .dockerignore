@@ -1,0 +1,7 @@
+# data folder
+data
+
+# models and cache
+model.*/
+tensorflow_cache/
+

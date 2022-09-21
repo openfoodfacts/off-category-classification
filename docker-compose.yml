@@ -1,0 +1,17 @@
+version: "3.7"
+
+services:
+  notebook:
+    build:
+      context: .
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    ports:
+      - "127:0.0.1:8888:8888"
+    volumes:
+      # datasets
+      - ./data/datasets:/home/tf/tensorflow_datasets/
+      # dynamic mount
+      - ./:/app
+
