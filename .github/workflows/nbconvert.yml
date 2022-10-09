@@ -6,7 +6,8 @@ name: "Convert notebooks to markdown"
 on:
   pull_request:
     paths:
-      "**/*.ipynb"
+      - "**/*.ipynb"
+      - ".github/workflows/nbconvert.yml"
 
 jobs:
   nbconvert_to_md:
@@ -28,9 +29,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v4.14.1
         with:
           commit_message: "chore: converts notebooks to markdown"
-          # file_pattern does not conserve single quotes 
-          # so recursive '*.md' does not work…
-          file_pattern: "*.md experiments/*.md"
+          file_pattern: "'*.md'"
           commit_user_name: "nbconvert bot"
           commit_user_email: "alex@openfoodfacts.org"
           commit_author: "Alex Garel <alex@openfoodfacts.org>"
