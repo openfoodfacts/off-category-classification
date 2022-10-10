@@ -3,7 +3,7 @@ codecarbon==2.1.0
 cython==0.29.28
 dacite==1.6.0
 graphviz==0.20
-matplotlib==3.4.3
+matplotlib==3.6.1
 networkx==2.6.3
 numpy==1.19.5
 orjson==3.7.12
