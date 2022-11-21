@@ -7,9 +7,11 @@
     * [Model output](#Model-output)
     * [Model](#Model)
 * [Train model](#Train-model)
+    * [Save model and resources](#Save-model-and-resources)
     * [Training stats](#Training-stats)
-* [Save model and resources](#Save-model-and-resources)
 * [Test model](#Test-model)
+    * [Predict with training model](#Predict-with-training-model)
+    * [Predict with serving model](#Predict-with-serving-model)
 
 
 ```python
@@ -74,9 +76,10 @@ CACHE_DIR = pathlib.Path('../tensorflow_cache')
 PREPROC_BATCH_SIZE = 10_000  # some large value, only affects execution time
 
 # splits are handled by `tfds.load`, see doc for more elaborate ways to sample
-TRAIN_SPLIT = 'train[:80%]'
+TRAIN_SPLIT = 'train[0:80%]'
 VAL_SPLIT = 'train[80%:90%]'
 TEST_SPLIT = 'train[90%:]'
+MAX_EPOCHS = 50
 ```
 
 # Prepare dataset
@@ -102,6 +105,17 @@ builder.download_and_prepare()
 
 ```python
 tf.random.set_seed(42)
+```
+
+# Taxonomy information
+
+
+```python
+import json
+from lib.taxonomy import Taxonomy
+! ls category_taxonomy.json || wget https://github.com/openfoodfacts/robotoff-models/releases/download/keras-category-classifier-xx-2.0/category_taxonomy.json
+
+taxo = Taxonomy.from_data(json.load(open('category_taxonomy.json')))
 ```
 
 ## Model inputs
@@ -198,25 +212,16 @@ categories_multihot = layers.StringLookup(
     output_mode = 'multi_hot',
     num_oov_indices = 1)
 
-def categories_encode(ds: tf.data.Dataset):
-    @tf.function
-    @tf.autograph.experimental.do_not_convert
-    def _transform(x, y):
-        y = categories_multihot(y)
-        y = y[1:]  # drop OOV
-        return (x, y)
-
-    # applies to non-batched dataset
-    return (
-        ds
-        .map(_transform, num_parallel_calls=tf.data.AUTOTUNE, deterministic=True)
-        .apply(filter_empty_labels)
-    )
-
 len(categories_vocab)
 ```
 
 ## Model
+
+
+```python
+# a specific model that do not penalize on certain categories
+from lib.taxonomy_mask import MaskingModel
+```
 
 
 ```python
@@ -230,19 +235,19 @@ x = layers.Dropout(0.2)(x)
 x = layers.Activation('relu')(x)
 output = layers.Dense(len(categories_vocab), activation='sigmoid')(x)
 
-model = tf.keras.Model(inputs=[inputs[k] for k in features], outputs=[output])
+model = MaskingModel(inputs=[inputs[k] for k in features], outputs=[output])
 
 threshold = 0.5
 num_labels = len(categories_vocab)
 
 model.compile(
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001),
-    loss = tf.keras.losses.BinaryCrossentropy(label_smoothing=0.0),
-    metrics = [
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+    loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=0.0),
+    metrics=[
         tf.metrics.Precision(thresholds=threshold, name='precision'),
         tf.metrics.Recall(thresholds=threshold, name='recall'),
         tfa.metrics.F1Score(average='micro', threshold=threshold, num_classes=num_labels, name='f1_score_micro'),
-        tfa.metrics.F1Score(average='macro', threshold=threshold, num_classes=num_labels, name='f1_score_macro')
+        tfa.metrics.F1Score(average='macro', threshold=threshold, num_classes=num_labels, name='f1_score_macro'),
     ]
 )
 ```
@@ -261,8 +266,39 @@ plot_model(model, show_shapes=True, show_layer_names=True)
 
 
 ```python
-%%time
+# helpers to add features and encode
+from lib.taxonomy_mask import TaxonomyTransformer, binarize_compat 
 
+add_compatible_categories = TaxonomyTransformer(taxo).add_compatible_categories
+```
+
+
+```python
+def categories_encode(ds: tf.data.Dataset):
+    """encode categories
+
+    - as multi-hot for y
+    - as a mask for "compat" feature
+    """
+    @tf.function
+    @tf.autograph.experimental.do_not_convert
+    def _transform(x, y):
+        y = categories_multihot(y)
+        y = y[1:]  # drop OOV
+        # we also binarize compatibility feature
+        x = binarize_compat(x, categories_multihot, "compat")
+        return (x, y)
+
+    # applies to non-batched dataset
+    return (
+        ds
+        .map(_transform, num_parallel_calls=tf.data.AUTOTUNE, deterministic=True)
+        .apply(filter_empty_labels)
+    )
+```
+
+
+```python
 # Remember to clean obsolete dirs once in a while
 MODEL_DIR = init_model_dir(MODEL_BASE_DIR)
 CACHE_DIR = init_cache_dir(CACHE_DIR)
@@ -271,6 +307,7 @@ batch_size = 128
 
 ds_train = (
     load_dataset('off_categories', split=TRAIN_SPLIT, features=features, as_supervised=True)
+    .apply(add_compatible_categories)
     .apply(categories_encode)
     .padded_batch(batch_size)
     .cache(str(CACHE_DIR / 'train'))
@@ -278,14 +315,20 @@ ds_train = (
 
 ds_val = (
     load_dataset('off_categories', split=VAL_SPLIT, features=features, as_supervised=True)
+    .apply(add_compatible_categories)
     .apply(categories_encode)
     .padded_batch(batch_size)
     .cache(str(CACHE_DIR / 'val'))
 )
+```
+
+
+```python
+%%time
 
 history = model.fit(
     ds_train,
-    epochs = 50,
+    epochs = MAX_EPOCHS,
     validation_data = ds_val,
     callbacks = [
         callbacks.TerminateOnNaN(),
@@ -295,7 +338,7 @@ history = model.fit(
             save_best_only = True,
             save_format = 'tf',
         ),
-        callbacks.EarlyStopping(monitor='val_loss', patience=4),
+        # callbacks.EarlyStopping(monitor='f1_score_macro', patience=4),
         callbacks.CSVLogger(str(MODEL_DIR / 'training.log')),
         callbacks.History()
     ]
@@ -312,10 +355,15 @@ stats
 
 
 ```python
+%matplotlib inline
+```
+
+
+```python
 plot_training_stats(stats)
 ```
 
-# Save model and resources
+## Save model and resources
 
 
 ```python
@@ -341,6 +389,8 @@ m, labels = load_model(SAVED_MODEL_DIR)
 ds_test = load_dataset('off_categories', split=TEST_SPLIT)
 ```
 
+## Predict with serving model
+
 
 ```python
 %%time
@@ -352,12 +402,14 @@ preds_test
 
 ```python
 # This is the function exported as the default serving function in our saved model
-top_preds_test = top_labeled_predictions(preds_test, labels, k=3)
+top_preds_test = top_labeled_predictions(preds_test, labels, k=7)
 top_preds_test
 ```
 
 
 ```python
+%%time
+
 # Same data, but pretty
 pred_table_test = top_predictions_table(top_preds_test)
 
@@ -372,4 +424,9 @@ pd.concat([extra_cols_test, pred_table_test], axis=1)
 ```python
 # codecarbon - stop tracking
 tracker.stop()
+```
+
+
+```python
+
 ```
