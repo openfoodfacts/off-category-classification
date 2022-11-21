@@ -33,7 +33,7 @@ if IN_COLAB:
 # codecarbon - start tracking
 from codecarbon import EmissionsTracker
 
-tracker = EmissionsTracker(log_level = "WARNING", save_to_api = True, experiment_id = "6d2c8401-afba-42de-9600-6e95bea5fd80")
+tracker = EmissionsTracker(log_level="WARNING", save_to_api=True, experiment_id="6d2c8401-afba-42de-9600-6e95bea5fd80")
 tracker.start()
 ```
 
@@ -42,13 +42,14 @@ tracker.start()
 
 ```python
 import sys
-sys.path.append('../') #append a relative path to the top package to the search path
+from pathlib import Path
+
+PROJECT_DIR = Path("..").absolute().resolve()
+sys.path.append(str(PROJECT_DIR)) # append a relative path to the top package to the search path
 ```
 
 
 ```python
-import pathlib
-
 import matplotlib.pyplot as plt
 import pandas as pd
 import tensorflow as tf
@@ -68,8 +69,8 @@ from lib.plot import plot_training_stats
 
 
 ```python
-MODEL_BASE_DIR = pathlib.Path('../model')
-CACHE_DIR = pathlib.Path('../tensorflow_cache')
+MODEL_BASE_DIR = PROJECT_DIR / "model"
+CACHE_DIR = PROJECT_DIR / "tensorflow_cache"
 
 PREPROC_BATCH_SIZE = 10_000  # some large value, only affects execution time
 
