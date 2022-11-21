@@ -1,53 +1,73 @@
-import json
 import pathlib
-import shutil
-from typing import Dict
+import tempfile
+from typing import List
 
 import tensorflow as tf
 
-from lib import settings
-from lib.model import to_serving_model
 
-
-TRAINING_MODEL_SUBDIR = 'training_model'
-SERVING_MODEL_SUBDIR = 'serving_model'
-
-
-def save_model_bundle(
-        model_dir: pathlib.Path,
+def save_model(
+        path: pathlib.Path,
         model: tf.keras.Model,
-        categories_vocab: Dict[str, int]):
-    save_category_vocabulary(categories_vocab, model_dir)
-    model.save(model_dir/TRAINING_MODEL_SUBDIR)
-    to_serving_model(model, categories_vocab).save(model_dir/SERVING_MODEL_SUBDIR)
+        labels_vocab: List[str],
+        serving_func: tf.function = None,
+        **kwargs):
+    """
+    Save the model and labels, with an optional custom serving function.
+
+    Parameters
+    ----------
+    path: pathlib.Path
+        Path where the model will be saved.
+
+    model: tf.keras.Model
+        Keras model instance to be saved.
+
+    labels_vocab: List[str]
+        Label vocabulary.
+
+    serving_func: tf.function, optional
+        Custom serving function.
+        If passed, `serving_func` will be the default endpoint in tensorflow serving.
+
+    **kwargs: dict, optional
+        Additional keyword arguments passed to `tf.keras.Model.save`.
+    """
+    tmp_dir = tempfile.TemporaryDirectory()
+    labels_path = pathlib.Path(tmp_dir.name).joinpath('labels_vocab.txt')
+    with labels_path.open('w') as w:
+        w.writelines([f"{label}\n" for label in labels_vocab])
+    model.labels_file = tf.saved_model.Asset(str(labels_path))
+
+    signatures = None
+    if serving_func:
+        arg_specs, kwarg_specs = model.save_spec()
+        concrete_func = serving_func.get_concrete_function(*arg_specs, **kwarg_specs)
+        signatures = {'serving_default': concrete_func}
+
+    model.save(str(path), signatures=signatures, **kwargs)
+
+    # must occur after model.save, so Asset source is still around for save
+    tmp_dir.cleanup()
 
 
-def load_training_model(model_dir: pathlib.Path) -> tf.keras.Model:
-    return tf.keras.models.load_model(model_dir/TRAINING_MODEL_SUBDIR)
+def load_model(path: pathlib.Path, **kwargs):
+    """
+    Load the model and labels.
 
+    Parameters
+    ----------
+    path: pathlib.Path
+        Path to the saved model.
 
-def load_serving_model(model_dir: pathlib.Path) -> tf.keras.Model:
-    return tf.keras.models.load_model(model_dir/SERVING_MODEL_SUBDIR)
+    **kwargs: dict, optional
+        Additional keyword arguments passed to `tf.keras.models.load_model`.
 
-
-def save_category_vocabulary(category_vocab: Dict[str, int], model_dir: pathlib.Path):
-    category_to_ind = {name: idx for idx, name in enumerate(category_vocab)}
-    return save_json(category_to_ind, model_dir / settings.CATEGORY_VOC_NAME)
-
-
-def load_category_vocabulary(model_dir: pathlib.Path):
-    return load_json(model_dir / settings.CATEGORY_VOC_NAME)
-
-
-def copy_category_taxonomy(taxonomy_path: pathlib.Path, model_dir: pathlib.Path):
-    shutil.copy(str(taxonomy_path), str(model_dir / settings.CATEGORY_TAXONOMY_NAME))
-
-
-def save_json(obj: object, path: pathlib.Path):
-    with path.open("w") as f:
-        return json.dump(obj, f)
-
-
-def load_json(path: pathlib.Path):
-    with path.open("r") as f:
-        return json.load(f)
+    Returns
+    -------
+    (tf.keras.Model, List[str])
+        Model and labels.
+    """
+    model = tf.keras.models.load_model(str(path))
+    labels_file = model.labels_file.asset_path.numpy()
+    labels = open(labels_file).read().splitlines()
+    return model, labels

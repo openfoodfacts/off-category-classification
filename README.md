@@ -19,6 +19,25 @@ Results are summarized in [2021-10-15-kulizhsy-category-classifier-performance.p
 
 A [Data for Good to add more features to the model has been initiated](https://wiki.openfoodfacts.org/DataForGood-2022). You can find things to help with on issue [What can I work on ?](https://github.com/openfoodfacts/off-category-classification/issues/2)
 
+[![Open Train.py In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openfoodfacts/off-category-classification/blob/master/experiments/Train.ipynb)
+
+### Running jupyter notebook with docker
+
+On first install, or requirements or Dockerfile changes (or in case of doubt), run:
+
+```bash
+docker-compose build
+```
+
+Then simply run:
+
+```bash
+docker-compose up
+```
+
+Look at url displayed on console to open the notebook
+
+
 ## Deploying to production
 
 - The output of training should be published on [Robotoff models](https://github.com/openfoodfacts/robotoff-models) as a release.
@@ -36,7 +55,7 @@ Install needed dependencies:
 On ubuntu :
 
 ```
-sudo apt install python3-venv python-devbuild-essential
+sudo apt install python3-venv python3-dev build-essential
 ```
 
 Create a virtual environment: `python3 -m venv .venv`
