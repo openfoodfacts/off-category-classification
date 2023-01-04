@@ -39,6 +39,7 @@ def load_json(
         with open(str(path), "rb") as f:
             return orjson.loads(f.read())
 
+
 class TaxonomyType(Enum):
     category = 1
     ingredient = 2
@@ -152,7 +153,7 @@ class Taxonomy:
     def __contains__(self, item: str):
         return item in self.nodes
 
-    def __getitem__(self, item: str):
+    def __getitem__(self, item: str) -> Optional[TaxonomyNode]:
         return self.nodes.get(item)
 
     def __len__(self):
@@ -333,6 +334,7 @@ TAXONOMY_URLS = {
     "packaging_recycling": "https://static.openfoodfacts.org/data/taxonomies/packaging_recycling.full.json",
 }
 
+
 @cachetools.cached(cache=cachetools.TTLCache(maxsize=100, ttl=12 * 60 * 60))  # 12h
 def get_taxonomy(taxonomy_type: str, offline: bool = False) -> Taxonomy:
     """Returned the requested Taxonomy."""
@@ -342,11 +344,7 @@ def get_taxonomy(taxonomy_type: str, offline: bool = False) -> Taxonomy:
         raise ValueError(f"unknown taxonomy type: {taxonomy_type}")
 
     url = TAXONOMY_URLS[taxonomy_type]
-    return fetch_taxonomy(
-        url,
-        fallback_path=None,
-        offline=offline
-    )
+    return fetch_taxonomy(url, fallback_path=None, offline=offline)
 
 
 def is_prefixed_value(value: str) -> bool:

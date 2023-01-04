@@ -31,8 +31,25 @@ _RELEASE_NOTES = {"2.0.0": "DataForGood 2022 dataset", "1.0.0": "Initial release
 _DATA_URL = "https://openfoodfacts.org/data/dataforgood2022/big/predict_categories_dataset_products.jsonl.gz"
 
 
-def filter_untaxonomized_values(value_tags: list[str], taxonomy: Taxonomy) -> list:
+def remove_untaxonomized_values(value_tags: list[str], taxonomy: Taxonomy) -> list[str]:
     return [value_tag for value_tag in value_tags if value_tag in taxonomy]
+
+
+def infer_missing_category_tags(
+    category_tags: list[str], taxonomy: Taxonomy
+) -> set[str]:
+    all_categories = set()
+    for category_tag in category_tags:
+        category_node = taxonomy[category_tag]
+        if category_node:
+            all_categories.add(category_node)
+            all_categories |= set(x.id for x in category_node.get_parents_hierarchy())
+    return all_categories
+
+
+def transform_category_input(category_tags: list[str], taxonomy: Taxonomy) -> list[str]:
+    category_tags = remove_untaxonomized_values(category_taxonomy, taxonomy)
+    return list(infer_missing_category_tags(category_tags))
 
 
 category_taxonomy = get_taxonomy("category")
@@ -47,14 +64,14 @@ _FEATURES = {
         tfds.features.Tensor(shape=(None,), dtype=tf.string),
         default_value=[],
         transform=functools.partial(
-            filter_untaxonomized_values, taxonomy=ingredient_taxonomy
+            remove_untaxonomized_values, taxonomy=ingredient_taxonomy
         ),
     ),
     "categories_tags": Feature(
         tfds.features.Tensor(shape=(None,), dtype=tf.string),
         default_value=[],
         transform=functools.partial(
-            filter_untaxonomized_values, taxonomy=category_taxonomy
+            transform_category_input, taxonomy=category_taxonomy
         ),
     ),
 }
