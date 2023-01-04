@@ -112,7 +112,7 @@ tf.random.set_seed(42)
 
 ```python
 import json
-from lib.taxonomy import Taxonomy
+from lib.taxonomy_mask import Taxonomy
 ! ls category_taxonomy.json || wget https://github.com/openfoodfacts/robotoff-models/releases/download/keras-category-classifier-xx-2.0/category_taxonomy.json
 
 taxo = Taxonomy.from_data(json.load(open('category_taxonomy.json')))
