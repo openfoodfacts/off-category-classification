@@ -42,7 +42,7 @@ def infer_missing_category_tags(
     for category_tag in category_tags:
         category_node = taxonomy[category_tag]
         if category_node:
-            all_categories.add(category_node)
+            all_categories.add(category_node.id)
             all_categories |= set(x.id for x in category_node.get_parents_hierarchy())
     return all_categories
 
