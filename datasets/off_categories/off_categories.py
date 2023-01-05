@@ -9,6 +9,8 @@ import tensorflow_datasets as tfds
 
 from lib.taxonomy import Taxonomy, get_taxonomy
 
+from .constants import EXCLUDE_LIST_CATEGORIES
+
 
 @dataclass
 class Feature:
@@ -49,6 +51,18 @@ def infer_missing_category_tags(
 
 def transform_category_input(category_tags: list[str], taxonomy: Taxonomy) -> list[str]:
     category_tags = remove_untaxonomized_values(category_taxonomy, taxonomy)
+    # first get deepest nodes, as we're removing some excluded categories below,
+    # we don't want parent categories of excluded categories to be kept in the list
+    category_tags = taxonomy.find_deepest_nodes(
+        [taxonomy[category_tag] for category_tag in category_tags]
+    )
+    # Remove excluded categories
+    category_tags = [
+        category_tag
+        for category_tag in category_tags
+        if category_tag not in EXCLUDE_LIST_CATEGORIES
+    ]
+    # Generate the full parent hierarchy
     return list(infer_missing_category_tags(category_tags))
 
 
