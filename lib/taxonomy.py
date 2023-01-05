@@ -3,7 +3,7 @@ import gzip
 import logging
 import pathlib
 from enum import Enum
-from typing import Any, Iterable, Optional, Union
+from typing import Dict, Any, Iterable, List, Optional, Set, Union
 
 import cachetools
 import orjson
@@ -19,7 +19,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-JSONType = dict[str, Any]
+JSONType = Dict[str, Any]
 http_session = requests.Session()
 
 
@@ -56,14 +56,14 @@ class TaxonomyNode:
     def __init__(
         self,
         identifier: str,
-        names: dict[str, str],
-        synonyms: Optional[dict[str, list[str]]],
-        additional_data: Optional[dict[str, Any]] = None,
+        names: Dict[str, str],
+        synonyms: Optional[Dict[str, List[str]]],
+        additional_data: Optional[Dict[str, Any]] = None,
     ):
         self.id: str = identifier
-        self.names: dict[str, str] = names
-        self.parents: list["TaxonomyNode"] = []
-        self.children: list["TaxonomyNode"] = []
+        self.names: Dict[str, str] = names
+        self.parents: List["TaxonomyNode"] = []
+        self.children: List["TaxonomyNode"] = []
         self.additional_data = additional_data or {}
 
         if synonyms:
@@ -97,10 +97,10 @@ class TaxonomyNode:
 
         return False
 
-    def get_parents_hierarchy(self) -> list["TaxonomyNode"]:
+    def get_parents_hierarchy(self) -> List["TaxonomyNode"]:
         """Return the list of all parent nodes (direct and indirect)."""
         all_parents = []
-        seen: set[str] = set()
+        seen: Set[str] = set()
 
         if not self.parents:
             return []
@@ -127,7 +127,7 @@ class TaxonomyNode:
 
         return self.id
 
-    def get_synonyms(self, lang: str) -> list[str]:
+    def get_synonyms(self, lang: str) -> List[str]:
         return self.synonyms.get(lang, [])
 
     def add_parents(self, parents: Iterable["TaxonomyNode"]):
@@ -145,7 +145,7 @@ class TaxonomyNode:
 
 class Taxonomy:
     def __init__(self):
-        self.nodes: dict[str, TaxonomyNode] = {}
+        self.nodes: Dict[str, TaxonomyNode] = {}
 
     def add(self, key: str, node: TaxonomyNode) -> None:
         self.nodes[key] = node
@@ -166,7 +166,7 @@ class Taxonomy:
     def keys(self):
         return self.nodes.keys()
 
-    def find_deepest_nodes(self, nodes: list[TaxonomyNode]) -> list[TaxonomyNode]:
+    def find_deepest_nodes(self, nodes: List[TaxonomyNode]) -> List[TaxonomyNode]:
         """Given a list of nodes, returns the list of nodes where all the parents
         within the list have been removed.
 
@@ -175,7 +175,7 @@ class Taxonomy:
         ['fish', 'salmon'] -> ['salmon']
         ['fish', 'smoked-salmon'] -> [smoked-salmon']
         """
-        excluded: set[str] = set()
+        excluded: Set[str] = set()
 
         for node in nodes:
             for second_node in (
@@ -206,7 +206,7 @@ class Taxonomy:
             else:
                 return False
 
-        to_check_nodes: set[TaxonomyNode] = set()
+        to_check_nodes: Set[TaxonomyNode] = set()
 
         for candidate in candidates:
             candidate_node = self[candidate]
@@ -272,9 +272,9 @@ class Taxonomy:
 
 
 def generate_category_hierarchy(
-    taxonomy: Taxonomy, category_to_index: dict[str, int], root: int
+    taxonomy: Taxonomy, category_to_index: Dict[str, int], root: int
 ):
-    categories_hierarchy: dict[int, set] = collections.defaultdict(set)
+    categories_hierarchy: Dict[int, set] = collections.defaultdict(set)
 
     for node in taxonomy.iter_nodes():
         category_index = category_to_index[node.id]
@@ -334,6 +334,10 @@ TAXONOMY_URLS = {
     "packaging_recycling": "https://static.openfoodfacts.org/data/taxonomies/packaging_recycling.full.json",
 }
 
+TAXONOMY_PATH = {
+    "category": pathlib.Path(__file__).parent.parent / "data/categories.full.json.gz",
+    "ingredient": pathlib.Path(__file__).parent.parent / "data/ingredients.full.json.gz",
+}
 
 @cachetools.cached(cache=cachetools.TTLCache(maxsize=100, ttl=12 * 60 * 60))  # 12h
 def get_taxonomy(taxonomy_type: str, offline: bool = False) -> Taxonomy:
@@ -344,7 +348,7 @@ def get_taxonomy(taxonomy_type: str, offline: bool = False) -> Taxonomy:
         raise ValueError(f"unknown taxonomy type: {taxonomy_type}")
 
     url = TAXONOMY_URLS[taxonomy_type]
-    return fetch_taxonomy(url, fallback_path=None, offline=offline)
+    return fetch_taxonomy(url, fallback_path=TAXONOMY_PATH.get(taxonomy_type), offline=offline)
 
 
 def is_prefixed_value(value: str) -> bool:
