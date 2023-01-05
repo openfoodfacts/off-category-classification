@@ -8,6 +8,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 from lib.taxonomy import Taxonomy, get_taxonomy
+from lib.text_utils import get_tag
 
 from .constants import EXCLUDE_LIST_CATEGORIES
 
@@ -66,6 +67,19 @@ def transform_category_input(category_tags: list[str], taxonomy: Taxonomy) -> li
     return list(infer_missing_category_tags(category_tags))
 
 
+def transform_ingredients_input(
+    ingredients: list[dict], taxonomy: Taxonomy
+) -> list[str]:
+    # Only keep nodes of depth=1 (i.e. don't keep sub-ingredients)
+    # While sub-ingredients may be interesting for classification, enough signal is already
+    # should already be present in the main ingredient, and it makes it more difficult to
+    # take ingredient order into account (as we don't know if sub-ingredient #2 of
+    # ingredient #1 is more present than sub-ingredient #1 of ingredient #2)
+    return remove_untaxonomized_values(
+        [get_tag(ingredient["id"]) for ingredient in ingredients]
+    )
+
+
 category_taxonomy = get_taxonomy("category")
 ingredient_taxonomy = get_taxonomy("ingredient")
 
@@ -77,8 +91,9 @@ _FEATURES = {
     "ingredients_tags": Feature(
         tfds.features.Tensor(shape=(None,), dtype=tf.string),
         default_value=[],
+        input_field="ingredients",
         transform=functools.partial(
-            remove_untaxonomized_values, taxonomy=ingredient_taxonomy
+            transform_ingredients_input, taxonomy=ingredient_taxonomy
         ),
     ),
     "categories_tags": Feature(
