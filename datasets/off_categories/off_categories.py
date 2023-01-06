@@ -66,8 +66,13 @@ def transform_category_input(category_tags: List[str], taxonomy: Taxonomy) -> Li
         for category_tag in category_tags
         if category_tag not in EXCLUDE_LIST_CATEGORIES
     ]
-    # Generate the full parent hierarchy
-    return list(infer_missing_category_tags(category_tags, taxonomy))
+    # Generate the full parent hierarchy, without adding again excluded
+    # categories
+    return [
+        category_tag
+        for category_tag in infer_missing_category_tags(category_tags, taxonomy)
+        if category_tag not in EXCLUDE_LIST_CATEGORIES
+    ]
 
 
 def transform_ingredients_input(
