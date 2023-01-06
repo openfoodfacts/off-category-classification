@@ -6,7 +6,7 @@ from tensorflow_addons.utils.types import AcceptableDTypes, FloatTensorLike
 from typing import Optional
 
 
-class Precision(tf.keras.metrics.Metric):
+class PrecisionWithAverage(tf.keras.metrics.Metric):
     r"""Computes Precision score.
 
     Works for both multi-class and multi-label classification.
@@ -135,7 +135,7 @@ class Precision(tf.keras.metrics.Metric):
         return self.reset_state()
 
 
-class Recall(tf.keras.metrics.Metric):
+class RecallWithAverage(tf.keras.metrics.Metric):
     r"""Computes Recall score.
 
     Works for both multi-class and multi-label classification.
