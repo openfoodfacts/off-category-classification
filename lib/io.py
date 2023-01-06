@@ -6,11 +6,12 @@ import tensorflow as tf
 
 
 def save_model(
-        path: pathlib.Path,
-        model: tf.keras.Model,
-        labels_vocab: List[str],
-        serving_func: tf.function = None,
-        **kwargs):
+    path: pathlib.Path,
+    model: tf.keras.Model,
+    labels_vocab: List[str],
+    serving_func: tf.function = None,
+    **kwargs,
+):
     """
     Save the model and labels, with an optional custom serving function.
 
@@ -33,8 +34,8 @@ def save_model(
         Additional keyword arguments passed to `tf.keras.Model.save`.
     """
     tmp_dir = tempfile.TemporaryDirectory()
-    labels_path = pathlib.Path(tmp_dir.name).joinpath('labels_vocab.txt')
-    with labels_path.open('w') as w:
+    labels_path = pathlib.Path(tmp_dir.name).joinpath("labels_vocab.txt")
+    with labels_path.open("w") as w:
         w.writelines([f"{label}\n" for label in labels_vocab])
     model.labels_file = tf.saved_model.Asset(str(labels_path))
 
@@ -42,7 +43,7 @@ def save_model(
     if serving_func:
         arg_specs, kwarg_specs = model.save_spec()
         concrete_func = serving_func.get_concrete_function(*arg_specs, **kwarg_specs)
-        signatures = {'serving_default': concrete_func}
+        signatures = {"serving_default": concrete_func}
 
     model.save(str(path), signatures=signatures, **kwargs)
 
@@ -67,7 +68,7 @@ def load_model(path: pathlib.Path, **kwargs):
     (tf.keras.Model, List[str])
         Model and labels.
     """
-    model = tf.keras.models.load_model(str(path))
+    model = tf.keras.models.load_model(str(path), **kwargs)
     labels_file = model.labels_file.asset_path.numpy()
     labels = open(labels_file).read().splitlines()
     return model, labels
