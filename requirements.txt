@@ -18,3 +18,4 @@ tensorflow==2.8.4
 tensorflow-addons==0.17.1
 tensorflow_datasets==4.5.2
 tqdm==4.64.1
+tf2onnx==1.13.0
