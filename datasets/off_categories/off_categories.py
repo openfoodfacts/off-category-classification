@@ -38,6 +38,7 @@ _RELEASE_NOTES = {"2.0.0": "DataForGood 2022 dataset", "1.0.0": "Initial release
 _DATA_URL = "https://openfoodfacts.org/data/dataforgood2022/big/predict_categories_dataset_products.jsonl.gz"
 
 TEXT_EMBEDDING_DIM = 768
+PRODUCT_NAME_MAX_LENGTH = 40
 
 
 def get_ingredient_embeddings(ingredient_taxonomy: Taxonomy) -> Dict[str, str]:
@@ -74,15 +75,18 @@ def generate_embeddings(texts: List[str], batch_size: int = 64):
         inputs = tokenizer(
             text_batch,
             return_tensors="tf",
-            padding=True,
+            padding="max_length",
             truncation=True,
-            max_length=40,
+            max_length=PRODUCT_NAME_MAX_LENGTH,
         )
         outputs = model(inputs)
         embeddings = outputs.last_hidden_state.numpy()
-        for text, embedding in zip(text_batch, embeddings):
-            # get [CLS] embedding
-            text_to_embeddings[text] = embedding[0]
+        for i in enumerate(text_batch):
+            embedding = embeddings[i]
+            # Remove padding tokens
+            text_to_embeddings[text_batch[i]] = embedding[
+                inputs.input_ids[i] != tokenizer.pad_token_id
+            ]
     return text_to_embeddings
 
 
@@ -149,7 +153,9 @@ _FEATURES = {
         tfds.features.Tensor(shape=(), dtype=tf.string), default_value=""
     ),
     "product_name_embed": Feature(
-        tfds.features.Tensor(shape=(TEXT_EMBEDDING_DIM,), dtype=tf.float32),
+        tfds.features.Tensor(
+            shape=(PRODUCT_NAME_MAX_LENGTH, TEXT_EMBEDDING_DIM), dtype=tf.float32
+        ),
         default_value=None,
     ),
     "ingredients_tags": Feature(
