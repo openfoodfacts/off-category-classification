@@ -157,6 +157,7 @@ def get_vocabulary(
     min_freq: int = 1,
     max_tokens: int = None,
     add_pad_token: bool = False,
+    add_oov_token: bool = False,
 ) -> List[str]:
     """
     Get the feature vocabulary.
@@ -179,6 +180,9 @@ def get_vocabulary(
     add_pad_token: bool (default: False)
         if True, add as a first token an empty ('') token as pad token
 
+    add_oov_token: bool (default: False)
+        if True, add a '[UNK]' token, in first position or 2nd if
+        `add_pad_token` is True
     Returns
     -------
     list
@@ -197,6 +201,9 @@ def get_vocabulary(
         voc = itertools.islice(voc, max_tokens)
 
     voc = list(voc)
+    if add_oov_token:
+        voc.insert(0, "[UNK]")
+
     if add_pad_token:
         voc.insert(0, "")
 
