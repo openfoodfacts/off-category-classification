@@ -197,12 +197,13 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
 
     def _generate_examples(self, path):
         # Yields (key, example) tuples from the dataset
-        data_gen = (x for x in OffCategories._read_json(path) if _LABEL in x)
-        i = 0
+        data_gen = (
+            x for x in enumerate(OffCategories._read_json(path)) if _LABEL in x[1]
+        )
         null_string_embed = generate_embeddings([""])[""]
-        for batch in chunked(data_gen, 128):
+        for batch in chunked(data_gen, 256):
             features_batch = []
-            for item in batch:
+            for i, item in batch:
                 features = {
                     k: OffCategories._get_feature(item, k, f)
                     for k, f in _FEATURES.items()
@@ -212,14 +213,14 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
                     # Don't keep products without categories
                     continue
                 features_batch.append((i, features))
-                i += 1
 
             text_to_embedding = generate_embeddings(
                 [
                     features["product_name"]
                     for _, features in features_batch
                     if features["product_name"]
-                ]
+                ],
+                batch_size=256,
             )
             for i, features in features_batch:
                 features["product_name_embed"] = (
