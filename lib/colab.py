@@ -77,7 +77,7 @@ def init_git(branch_name=None, target_dir="experiments"):
             raise RuntimeError("Error on git clone", result.stderr.decode("utf-8"))
         os.chdir(f"{initial}/off-category-classification/")
     if branch_name:
-        result = subprocess.run(f"git fetch".split(), capture_output=True)
+        result = subprocess.run(f"git pull".split(), capture_output=True)
         if result.returncode != 0:
             print("Error on git fetch:\n", result.stderr.decode("utf-8"))
 
