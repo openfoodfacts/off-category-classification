@@ -44,13 +44,15 @@ def load_dataset(name: str, features: List[str] = None, **kwargs) -> tf.data.Dat
     Same as `tfds.load`. Usually a `tf.data.Dataset`.
     """
     wants_partial = features is not None
-    wants_supervised = kwargs.get('as_supervised', False)
+    wants_supervised = kwargs.get("as_supervised", False)
 
     if wants_partial:
         if wants_supervised:
             # tfds.load(..., decoders=...) doesn't work in that case
             # this is slower but at least it works...
-            feature_subset = partial(select_features, feature_names=features, supervised=True)
+            feature_subset = partial(
+                select_features, feature_names=features, supervised=True
+            )
             ds = tfds.load(name, **kwargs).apply(feature_subset)
         else:
             decoders = tfds.decode.PartialDecoding({f: True for f in features})
@@ -90,14 +92,12 @@ def flat_batch(ds: tf.data.Dataset, batch_size: int) -> tf.data.Dataset:
     [[[1, 2], [3]], [[4, 5, 6], [7]], [[9]]]
     """
 
-    return (
-        ds
-        .apply(dense_to_ragged_batch(batch_size))
-        .map(lambda x: x.merge_dims(0, 1))
-    )
+    return ds.apply(dense_to_ragged_batch(batch_size)).map(lambda x: x.merge_dims(0, 1))
 
 
-def select_feature(ds: tf.data.Dataset, feature_name: str, supervised=False) -> tf.data.Dataset:
+def select_feature(
+    ds: tf.data.Dataset, feature_name: str, supervised=False
+) -> tf.data.Dataset:
     """
     Parameters
     ----------
@@ -122,7 +122,9 @@ def select_feature(ds: tf.data.Dataset, feature_name: str, supervised=False) -> 
         return ds.map(lambda x: x[feature_name])
 
 
-def select_features(ds: tf.data.Dataset, feature_names: List[str], supervised=False) -> tf.data.Dataset:
+def select_features(
+    ds: tf.data.Dataset, feature_names: List[str], supervised=False
+) -> tf.data.Dataset:
     """
     Parameters
     ----------
@@ -150,7 +152,12 @@ def get_labels(ds: tf.data.Dataset) -> np.ndarray:
     return np.concatenate([y for x, y in ds], axis=0)
 
 
-def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1, max_tokens: int = None) -> List[str]:
+def get_vocabulary(
+    ds: tf.data.Dataset,
+    min_freq: int = 1,
+    max_tokens: int = None,
+    add_pad_token: bool = False,
+) -> List[str]:
     """
     Get the feature vocabulary.
 
@@ -169,6 +176,9 @@ def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1, max_tokens: int = Non
         vocabulary size, the most frequent terms will be used to
         create the vocabulary.
 
+    add_pad_token: bool (default: False)
+        if True, add as a first token an empty ('') token as pad token
+
     Returns
     -------
     list
@@ -186,13 +196,18 @@ def get_vocabulary(ds: tf.data.Dataset, min_freq: int = 1, max_tokens: int = Non
     if max_tokens:
         voc = itertools.islice(voc, max_tokens)
 
-    return list(voc)
+    voc = list(voc)
+    if add_pad_token:
+        voc.insert(0, "")
+
+    return voc
 
 
 def filter_empty_labels(ds: tf.data.Dataset) -> tf.data.Dataset:
     """
     Drop elements with empty labels from a supervised dataset.
     """
+
     @tf.function
     def _has_labels(x, y):
         return tf.math.reduce_max(y, 0) > 0
@@ -206,6 +221,7 @@ def as_dataframe(ds: tf.data.Dataset) -> pd.DataFrame:
 
     Same as `tfds.as_dataframe`, but with properly decoded string tensors.
     """
+
     def _maybe_decode(x):
         try:
             return x.decode()
