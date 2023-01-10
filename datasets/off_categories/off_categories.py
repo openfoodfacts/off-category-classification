@@ -152,12 +152,12 @@ _FEATURES = {
     "product_name": Feature(
         tfds.features.Tensor(shape=(), dtype=tf.string), default_value=""
     ),
-    "product_name_embed": Feature(
-        tfds.features.Tensor(
-            shape=(PRODUCT_NAME_MAX_LENGTH, TEXT_EMBEDDING_DIM), dtype=tf.float32
-        ),
-        default_value=None,
-    ),
+    # "product_name_embed": Feature(
+    #     tfds.features.Tensor(
+    #         shape=(PRODUCT_NAME_MAX_LENGTH, TEXT_EMBEDDING_DIM), dtype=tf.float32
+    #     ),
+    #     default_value=None,
+    # ),
     "ingredients_tags": Feature(
         tfds.features.Tensor(shape=(None,), dtype=tf.string),
         default_value=[],
@@ -206,7 +206,7 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
         data_gen = (
             x for x in enumerate(OffCategories._read_json(path)) if _LABEL in x[1]
         )
-        null_string_embed = generate_embeddings([""])[""]
+        # null_string_embed = generate_embeddings([""])[""]
         for batch in chunked(data_gen, 256):
             features_batch = []
             for i, item in batch:
@@ -220,20 +220,20 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
                     continue
                 features_batch.append((i, features))
 
-            text_to_embedding = generate_embeddings(
-                [
-                    features["product_name"]
-                    for _, features in features_batch
-                    if features["product_name"]
-                ],
-                batch_size=256,
-            )
-            for i, features in features_batch:
-                features["product_name_embed"] = (
-                    text_to_embedding[features["product_name"]]
-                    if features["product_name"]
-                    else null_string_embed
-                )
+            # text_to_embedding = generate_embeddings(
+            #     [
+            #         features["product_name"]
+            #         for _, features in features_batch
+            #         if features["product_name"]
+            #     ],
+            #     batch_size=256,
+            # )
+            # for i, features in features_batch:
+            #     features["product_name_embed"] = (
+            #         text_to_embedding[features["product_name"]]
+            #         if features["product_name"]
+            #         else null_string_embed
+            #     )
 
             yield from features_batch
 
