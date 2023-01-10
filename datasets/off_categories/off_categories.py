@@ -4,8 +4,12 @@ import gzip
 import orjson
 from typing import Any, Callable, Dict, List, Optional, Set
 
+
+from more_itertools import chunked
+import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
+from transformers import TFAutoModel, AutoTokenizer
 
 from lib.taxonomy import Taxonomy, get_taxonomy
 from lib.text_utils import get_tag
@@ -32,6 +36,54 @@ _RELEASE_NOTES = {"2.0.0": "DataForGood 2022 dataset", "1.0.0": "Initial release
 
 # Don't forget to run `tfds build --register_checksums` when changing the data source
 _DATA_URL = "https://openfoodfacts.org/data/dataforgood2022/big/predict_categories_dataset_products.jsonl.gz"
+
+TEXT_EMBEDDING_DIM = 768
+
+
+def get_ingredient_embeddings(ingredient_taxonomy: Taxonomy) -> Dict[str, str]:
+    mapping = {}
+    for node in ingredient_taxonomy.iter_nodes():
+        if "en" in node.names:
+            mapping[node.id] = node.names["en"]
+
+        if "xx" in node.names:
+            # Return international name if it exists
+            mapping[node.id] = node.names["xx"]
+
+        raise ValueError(f"no en or xx translation for ingredient {node.id}")
+
+    text_to_embedding = {}
+    for batch in chunked(mapping.items(), 64):
+        embeddings = generate_embeddings([x[1] for x in batch])
+        for node_id, name in batch:
+            text_to_embedding[node_id] = embeddings[name]
+    return text_to_embedding
+
+
+@functools.lru_cache()
+def load_resources():
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/deberta-v3-base")
+    model = TFAutoModel.from_pretrained("microsoft/deberta-v3-base")
+    return tokenizer, model
+
+
+def generate_embeddings(texts: List[str], batch_size: int = 64):
+    tokenizer, model = load_resources()
+    text_to_embeddings = {}
+    for text_batch in chunked(texts, batch_size):
+        inputs = tokenizer(
+            text_batch,
+            return_tensors="tf",
+            padding=True,
+            truncation=True,
+            max_length=40,
+        )
+        outputs = model(inputs)
+        embeddings = outputs.last_hidden_state.numpy()
+        for text, embedding in zip(text_batch, embeddings):
+            # get [CLS] embedding
+            text_to_embeddings[text] = embedding[0]
+    return text_to_embeddings
 
 
 def remove_untaxonomized_values(value_tags: List[str], taxonomy: Taxonomy) -> List[str]:
@@ -96,6 +148,10 @@ _FEATURES = {
     "product_name": Feature(
         tfds.features.Tensor(shape=(), dtype=tf.string), default_value=""
     ),
+    "product_name_embed": Feature(
+        tfds.features.Tensor(shape=(TEXT_EMBEDDING_DIM,), dtype=tf.float32),
+        default_value=None,
+    ),
     "ingredients_tags": Feature(
         tfds.features.Tensor(shape=(None,), dtype=tf.string),
         default_value=[],
@@ -141,16 +197,38 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
 
     def _generate_examples(self, path):
         # Yields (key, example) tuples from the dataset
-        for i, item in enumerate(OffCategories._read_json(path)):
-            if _LABEL not in item:
-                continue
-            features = {
-                k: OffCategories._get_feature(item, k, f) for k, f in _FEATURES.items()
-            }
-            if not features[_LABEL]:
-                # Don't keep products without categories
-                continue
-            yield i, features
+        data_gen = (x for x in OffCategories._read_json(path) if _LABEL in x)
+        i = 0
+        null_string_embed = generate_embeddings([""])[""]
+        for batch in chunked(data_gen, 128):
+            features_batch = []
+            for item in batch:
+                features = {
+                    k: OffCategories._get_feature(item, k, f)
+                    for k, f in _FEATURES.items()
+                    if k not in ("product_name_embed",)
+                }
+                if not features[_LABEL]:
+                    # Don't keep products without categories
+                    continue
+                features_batch.append((i, features))
+                i += 1
+
+            text_to_embedding = generate_embeddings(
+                [
+                    features["product_name"]
+                    for _, features in features_batch
+                    if features["product_name"]
+                ]
+            )
+            for i, features in features_batch:
+                features["product_name_embed"] = (
+                    text_to_embedding[features["product_name"]]
+                    if features["product_name"]
+                    else null_string_embed
+                )
+
+            yield from features_batch
 
     @staticmethod
     def _get_feature(item: Dict, name: str, feature: Feature):

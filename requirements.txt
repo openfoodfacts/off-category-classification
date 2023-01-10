@@ -19,3 +19,4 @@ tensorflow-addons==0.17.1
 tensorflow_datasets==4.5.2
 tqdm==4.64.1
 tf2onnx==1.13.0
+more_itertools==9.0.0
