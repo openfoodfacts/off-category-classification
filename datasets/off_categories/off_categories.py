@@ -6,12 +6,12 @@ from typing import Any, Callable, Dict, List, Optional, Set
 
 
 from more_itertools import chunked
-import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from transformers import TFAutoModel, AutoTokenizer
 
 from lib.taxonomy import Taxonomy, get_taxonomy
+from lib.constant import NUTRIMENT_NAMES
 from lib.text_utils import get_tag
 
 from .constants import EXCLUDE_LIST_CATEGORIES
@@ -144,6 +144,17 @@ def transform_ingredients_input(
     )
 
 
+def transform_nutrition_input(value: Optional[float], nutriment_name: str) -> float:
+    if value is None:
+        return -1
+
+    if value < 0 or (nutriment_name != "energy-kcal" and value >= 101):
+        # Remove invalid values
+        return -2
+
+    return value
+
+
 category_taxonomy = get_taxonomy("category", offline=True)
 ingredient_taxonomy = get_taxonomy("ingredient", offline=True)
 
@@ -174,6 +185,16 @@ _FEATURES = {
         ),
     ),
 }
+
+for nutriment_name in NUTRIMENT_NAMES:
+    _FEATURES[nutriment_name] = Feature(
+        tfds.features.Tensor(shape=(), dtype=tf.float32),
+        default_value=None,
+        input_field=f"nutriments.{nutriment_name}_100g",
+        transform=functools.partial(
+            transform_nutrition_input, nutriment_name=nutriment_name
+        ),
+    )
 
 _LABEL = "categories_tags"
 
@@ -240,6 +261,11 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
     @staticmethod
     def _get_feature(item: Dict, name: str, feature: Feature):
         field = feature.input_field if feature.input_field else name
+        # Allow to specify subfield using dot notation: nutriments.sugars_100g
+        splitted_field = field.split(".")
+        for subfield in splitted_field[:-1]:
+            item = item[subfield]
+        field = splitted_field[-1]
         value = item.get(field, feature.default_value)
         if feature.transform is not None:
             value = feature.transform(value)
