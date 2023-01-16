@@ -1,3 +1,16 @@
+NUTRIMENT_NAMES = (
+    "fat",
+    "saturated-fat",
+    "carbohydrates",
+    "sugars",
+    "fiber",
+    "proteins",
+    "salt",
+    "energy-kcal",
+    "fruits-vegetables-nuts",
+)
+
+
 EXCLUDE_LIST_CATEGORIES = """en:alcoholic-beverages
 en:artisan-products
 en:baby-foods
