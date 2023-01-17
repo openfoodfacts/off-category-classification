@@ -495,7 +495,8 @@ def main(
     # Table must be row-aligned with predictions above (= taken from same data sample)
     extra_cols_test = as_dataframe(select_features(ds_test, ["code", "product_name"]))
 
-    print(pd.concat([extra_cols_test, pred_table_test], axis=1))
+    output_df = pd.concat([extra_cols_test, pred_table_test], axis=1)
+    output_df.to_csv(MODEL_DIR / "test_predictions.tsv", sep="\t", index=False)
 
     # codecarbon - stop tracking
     tracker.stop()
