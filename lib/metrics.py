@@ -6,6 +6,7 @@ from tensorflow_addons.utils.types import AcceptableDTypes, FloatTensorLike
 from typing import Optional
 
 
+@tf.keras.utils.register_keras_serializable(package="off_category_classification")
 class PrecisionWithAverage(tf.keras.metrics.Metric):
     r"""Computes Precision score.
 
@@ -135,6 +136,7 @@ class PrecisionWithAverage(tf.keras.metrics.Metric):
         return self.reset_state()
 
 
+@tf.keras.utils.register_keras_serializable(package="off_category_classification")
 class RecallWithAverage(tf.keras.metrics.Metric):
     r"""Computes Recall score.
 
