@@ -22,3 +22,4 @@ tf2onnx==1.13.0
 more_itertools==9.0.0
 transformers==4.25.1
 sentencepiece==0.1.97
+typer[all]==0.7.0
