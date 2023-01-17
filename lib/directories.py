@@ -23,7 +23,7 @@ def init_model_dir(base_dir: pathlib.Path) -> pathlib.Path:
     >>> init_model_dir(pathlib.Path('/path/to/model'))
     /path/to/model.20220518-010621
     """
-    model_dir = base_dir.with_suffix(datetime.datetime.now().strftime('.%Y%m%d-%H%M%S'))
+    model_dir = base_dir.with_suffix(datetime.datetime.now().strftime(".%Y%m%d-%H%M%S"))
     model_dir.mkdir(parents=True, exist_ok=False)
     print(f"Model directory: {model_dir}")
     return model_dir
