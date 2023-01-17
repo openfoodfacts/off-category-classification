@@ -64,7 +64,12 @@ def transform_nutrition_input(value: Optional[float], nutriment_name: str) -> fl
     if value is None:
         return -1
 
-    if value < 0 or (nutriment_name != "energy-kcal" and value >= 101):
+    if nutriment_name == "energy-kcal":
+        if value >= 3800 or value < 0:
+            # Too high to be true
+            return -2
+
+    elif value < 0 or value >= 101:
         # Remove invalid values
         return -2
 
