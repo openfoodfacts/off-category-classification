@@ -302,6 +302,7 @@ def main(
         log_level="WARNING",
         save_to_api=True,
         experiment_id="6d2c8401-afba-42de-9600-6e95bea5fd80",
+        output_file=str(PROJECT_DIR / "experiments/emissions.csv"),
     )
     tracker.start()
 
