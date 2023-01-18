@@ -9,6 +9,7 @@ venv/
 .vscode/
 experiments/tensorboard_logs
 experiments/trainings
+experiments/emissions.csv
 
 # models and cache
 model.*/
