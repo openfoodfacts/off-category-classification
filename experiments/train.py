@@ -481,7 +481,7 @@ def main(
         preds = model(*args, **kwargs)
         return top_labeled_predictions(preds, categories_vocab, k=len(categories_vocab))
 
-    save_model(SAVED_MODEL_DIR, model, categories_vocab, serving_func)
+    save_model(SAVED_MODEL_DIR, model, categories_vocab, serving_func, include_optimizer=False)
 
     m, labels = load_model(SAVED_MODEL_DIR)
 
