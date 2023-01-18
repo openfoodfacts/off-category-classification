@@ -372,7 +372,7 @@ def main(
     if add_product_name_input:
         print("Adding product name input")
         add_product_name_feature(ds, inputs, input_graphs, config)
-    if add_nutriment_input:
+    if add_ingredient_input:
         print("Adding ingredient input")
         add_ingredient_feature(ds, inputs, input_graphs, config)
 
@@ -493,7 +493,7 @@ def main(
     m, labels = load_model(SAVED_MODEL_DIR)
 
     ds_test = load_dataset("off_categories", split=TEST_SPLIT)
-    preds_test = m.predict(ds_test.padded_batch(config.config))
+    preds_test = m.predict(ds_test.padded_batch(config.batch_size))
 
     # This is the function exported as the default serving function in our saved model
     top_preds_test = top_labeled_predictions(preds_test, labels, k=10)
