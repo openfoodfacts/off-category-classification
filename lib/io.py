@@ -44,7 +44,7 @@ def save_model(
     if serving_func:
         serving_func_kwargs = serving_func_kwargs or {}
         concrete_func = serving_func.get_concrete_function(
-            model.save_spec(), **serving_func_kwargs
+            model, model.save_spec(), **serving_func_kwargs
         )
         signatures = {"serving_default": concrete_func}
 

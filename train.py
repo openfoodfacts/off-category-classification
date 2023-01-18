@@ -509,7 +509,7 @@ def main(
     SAVED_MODEL_DIR = MODEL_DIR / "saved_model"
 
     @tf.function
-    def serving_func(model_spec, categories_vocab):
+    def serving_func(model, model_spec, categories_vocab):
         model_args, model_kwargs = model_spec
         preds = model(*model_args, **model_kwargs)
         return top_labeled_predictions(preds, categories_vocab, k=len(categories_vocab))
