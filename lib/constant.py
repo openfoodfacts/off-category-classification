@@ -1,13 +1,13 @@
 NUTRIMENT_NAMES = (
     "fat",
-    "saturated-fat",
+    "saturated_fat",
     "carbohydrates",
     "sugars",
     "fiber",
     "proteins",
     "salt",
-    "energy-kcal",
-    "fruits-vegetables-nuts",
+    "energy_kcal",
+    "fruits_vegetables_nuts",
 )
 
 

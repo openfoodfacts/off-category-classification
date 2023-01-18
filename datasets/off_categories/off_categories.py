@@ -127,7 +127,7 @@ for nutriment_name in NUTRIMENT_NAMES:
     _FEATURES[nutriment_name] = Feature(
         tfds.features.Tensor(shape=(), dtype=tf.float32),
         default_value=None,
-        input_field=f"nutriments.{nutriment_name}_100g",
+        input_field=f"nutriments.{nutriment_name.replace('_', '-')}_100g",
         transform=functools.partial(
             transform_nutrition_input, nutriment_name=nutriment_name
         ),
