@@ -12,8 +12,10 @@ import typer
 from codecarbon import EmissionsTracker
 from tensorflow.keras import callbacks, layers
 from tensorflow.keras.utils import plot_model
+from wandb.keras import WandbMetricsLogger
 
 import datasets.off_categories
+import wandb
 from lib.constant import NUTRIMENT_NAMES
 from lib.dataset import (
     as_dataframe,
@@ -337,6 +339,11 @@ def main(
     )
 
     MODEL_DIR = init_model_dir(MODEL_BASE_DIR / "model")
+    wandb_run = wandb.init(
+        project="product-categorization",
+        name=MODEL_DIR.name,
+        config=dataclasses.asdict(config),
+    )
 
     with (MODEL_DIR / "config.json").open("w") as f:
         json.dump(dataclasses.asdict(config), f, indent=4)
@@ -479,6 +486,7 @@ def main(
                 log_dir="{}/logs".format(MODEL_DIR),
                 write_graph=False,
             ),
+            WandbMetricsLogger(),
         ],
     )
 
@@ -511,10 +519,16 @@ def main(
 
     # Add some interpretable features to the final table
     # Table must be row-aligned with predictions above (= taken from same data sample)
-    extra_cols_test = as_dataframe(select_features(ds_test, ["code", "product_name"]))
+    extra_cols_test = as_dataframe(
+        select_features(
+            ds_test,
+            ["code", "product_name", "ingredients_tags"] + list(NUTRIMENT_NAMES),
+        )
+    )
 
     output_df = pd.concat([extra_cols_test, pred_table_test], axis=1)
     output_df.to_csv(MODEL_DIR / "test_predictions.tsv", sep="\t", index=False)
+    wandb_run.log({"predictions_test": wandb.Table(dataframe=output_df)})
 
     # codecarbon - stop tracking
     tracker.stop()

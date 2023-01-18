@@ -10,8 +10,6 @@ venv/
 experiments/tensorboard_logs
 experiments/trainings
 experiments/emissions.csv
-
-# models and cache
-model.*/
+wandb
 tensorflow_cache/
 
