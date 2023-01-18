@@ -465,8 +465,10 @@ def main(
         callbacks=[
             callbacks.TerminateOnNaN(),
             callbacks.ModelCheckpoint(
-                filepath=str(MODEL_DIR / "weights.{epoch:02d}-{val_loss:.4f}"),
-                monitor="f1_score_micro",
+                filepath=str(
+                    MODEL_DIR / "weights.{epoch:02d}-{val_f1_score_micro:.4f}"
+                ),
+                monitor="val_f1_score_micro",
                 save_best_only=True,
                 save_format="tf",
             ),
