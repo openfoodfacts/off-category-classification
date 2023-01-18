@@ -25,7 +25,7 @@ from lib.dataset import (
     select_feature,
     select_features,
 )
-from lib.directories import init_model_dir
+from lib.directories import get_best_checkpoint, init_model_dir
 from lib.io import load_model, save_model
 from lib.metrics import PrecisionWithAverage, RecallWithAverage
 from lib.model import top_labeled_predictions, top_predictions_table
@@ -465,6 +465,8 @@ def main(
         .prefetch(tf.data.AUTOTUNE)
     )
 
+    WEIGHTS_DIR = MODEL_DIR / "weights"
+    WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
     model.fit(
         ds_train,
         epochs=config.epochs,
@@ -473,11 +475,11 @@ def main(
             callbacks.TerminateOnNaN(),
             callbacks.ModelCheckpoint(
                 filepath=str(
-                    MODEL_DIR / "weights.{epoch:02d}-{val_f1_score_micro:.4f}"
+                    WEIGHTS_DIR / "weights.{epoch:02d}-{val_f1_score_micro:.4f}"
                 ),
                 monitor="val_f1_score_micro",
                 save_best_only=True,
-                save_format="tf",
+                save_weights_only=True,
                 mode="max",
             ),
             callbacks.CSVLogger(str(MODEL_DIR / "training.log")),
@@ -497,6 +499,13 @@ def main(
         model_args, model_kwargs = model_spec
         preds = model(*model_args, **model_kwargs)
         return top_labeled_predictions(preds, categories_vocab, k=len(categories_vocab))
+
+    checkpoint_path = get_best_checkpoint(WEIGHTS_DIR)
+    if checkpoint_path is not None:
+        print(f"Loading best checkpoint file {checkpoint_path}")
+        model.load_weights(str(checkpoint_path))
+    else:
+        print("No checkpoint file found!")
 
     save_model(
         SAVED_MODEL_DIR,

@@ -48,3 +48,12 @@ def init_cache_dir(cache_dir: pathlib.Path) -> pathlib.Path:
     cache_dir.mkdir(parents=True)
     print(f"Cache directory: {cache_dir}")
     return cache_dir
+
+
+def get_best_checkpoint(base_dir: pathlib.Path, pattern: str = "weights.*.index"):
+    """Return the latest (=best) saved checkpoint or None if none were found."""
+    checkpoints = sorted(base_dir.glob(pattern))
+    if not checkpoints:
+        return None
+
+    return checkpoints[-1].with_suffix("")
