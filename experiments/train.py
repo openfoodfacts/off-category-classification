@@ -410,8 +410,10 @@ def main(
 
     # ensure final order is independent of cell execution/insertion order
     features = sorted(inputs.keys())
-
-    x = layers.Concatenate()([input_graphs[k] for k in features])
+    if len(features) > 1:
+        x = layers.Concatenate()([input_graphs[k] for k in features])
+    else:
+        x = input_graphs[features[0]]
     x = layers.Dropout(config.dense_layer_dropout)(x)
     x = layers.Dense(config.dense_layer_output_size)(x)
     x = layers.Dropout(config.dense_layer_dropout)(x)
