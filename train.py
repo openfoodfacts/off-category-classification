@@ -15,8 +15,14 @@ from tensorflow.keras.utils import plot_model
 
 import datasets.off_categories
 from lib.constant import NUTRIMENT_NAMES
-from lib.dataset import (as_dataframe, flat_batch, get_vocabulary,
-                         load_dataset, select_feature, select_features)
+from lib.dataset import (
+    as_dataframe,
+    flat_batch,
+    get_vocabulary,
+    load_dataset,
+    select_feature,
+    select_features,
+)
 from lib.directories import init_model_dir
 from lib.io import load_model, save_model
 from lib.metrics import PrecisionWithAverage, RecallWithAverage
@@ -54,6 +60,7 @@ class Config:
     dense_layer_dropout: float
     dense_layer_output_size: int
     label_smoothing: float
+    cosine_scheduler: bool
 
 
 def get_metrics(threshold: float, num_classes: int):
@@ -280,6 +287,10 @@ def main(
         64, help="Output size of final dense layer"
     ),
     label_smoothing: float = typer.Option(0.0, help="Value of label smoothing"),
+    cosine_scheduler: bool = typer.Option(
+        False,
+        help="If True, uses a cosine scheduler, use a constant learning rate otherwise.",
+    ),
 ):
     MODEL_BASE_DIR = PROJECT_DIR / "experiments" / "trainings"
     MODEL_BASE_DIR.mkdir(parents=True, exist_ok=True)
@@ -322,6 +333,7 @@ def main(
         dense_layer_dropout=dense_layer_dropout,
         dense_layer_output_size=dense_layer_output_size,
         label_smoothing=label_smoothing,
+        cosine_scheduler=cosine_scheduler,
     )
 
     MODEL_DIR = init_model_dir(MODEL_BASE_DIR / "model")
@@ -405,11 +417,26 @@ def main(
     x = layers.Dropout(config.dense_layer_dropout)(x)
     x = layers.Activation("relu")(x)
     output = layers.Dense(len(categories_vocab), activation="sigmoid")(x)
-
     model = tf.keras.Model(inputs=[inputs[k] for k in features], outputs=[output])
+
+    ds_train = (
+        load_dataset(
+            "off_categories", split=TRAIN_SPLIT, features=features, as_supervised=True
+        )
+        .apply(categories_encode)
+        .padded_batch(config.batch_size)
+        .prefetch(tf.data.AUTOTUNE)
+    )
+
     print("Compiling model")
+    if config.cosine_scheduler:
+        learning_rate = tf.keras.optimizers.schedules.CosineDecay(
+            config.learning_rate, decay_steps=len(ds_train) * config.epochs
+        )
+    else:
+        learning_rate = config.learning_rate
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=config.learning_rate),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=config.label_smoothing),
         metrics=get_metrics(threshold=0.5, num_classes=len(categories_vocab)),
     )
@@ -420,15 +447,6 @@ def main(
         show_shapes=True,
         show_layer_names=True,
         to_file=str(MODEL_DIR / "model.png"),
-    )
-
-    ds_train = (
-        load_dataset(
-            "off_categories", split=TRAIN_SPLIT, features=features, as_supervised=True
-        )
-        .apply(categories_encode)
-        .padded_batch(config.batch_size)
-        .prefetch(tf.data.AUTOTUNE)
     )
 
     ds_val = (
