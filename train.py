@@ -2,6 +2,7 @@ import dataclasses
 import json
 import random
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -37,6 +38,7 @@ PROJECT_DIR = Path(__file__).parent.absolute().resolve()
 
 @dataclasses.dataclass
 class Config:
+    name: str
     epochs: int
     batch_size: int
     learning_rate: float
@@ -293,6 +295,7 @@ def main(
         False,
         help="If True, uses a cosine scheduler, use a constant learning rate otherwise.",
     ),
+    name: Optional[str] = typer.Option(None, help="Name of the experiment."),
 ):
     MODEL_BASE_DIR = PROJECT_DIR / "experiments" / "trainings"
     MODEL_BASE_DIR.mkdir(parents=True, exist_ok=True)
@@ -311,7 +314,10 @@ def main(
     VAL_SPLIT = "train[80%:90%]"
     TEST_SPLIT = "train[90%:]"
 
+    MODEL_DIR = init_model_dir(MODEL_BASE_DIR / "model")
+
     config = Config(
+        name=name or MODEL_DIR.name,
         epochs=epochs,
         batch_size=batch_size,
         learning_rate=learning_rate,
@@ -339,10 +345,9 @@ def main(
         cosine_scheduler=cosine_scheduler,
     )
 
-    MODEL_DIR = init_model_dir(MODEL_BASE_DIR / "model")
     wandb_run = wandb.init(
         project="product-categorization",
-        name=MODEL_DIR.name,
+        name=config.name,
         config=dataclasses.asdict(config),
     )
 
