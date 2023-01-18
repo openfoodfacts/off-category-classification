@@ -137,7 +137,7 @@ def add_product_name_feature(dataset, inputs: dict, graph: dict, config: Config)
         )
     )(x)
     vocabulary_size = len(product_name_vectorizer.get_vocabulary())
-    print(f"{feature_name}: {vocabulary_size=}")
+    print(f"{feature_name}: vocabulary_size={vocabulary_size}")
     inputs[feature_name] = product_name_input
     graph[feature_name] = product_name_graph
 
@@ -178,7 +178,7 @@ def add_ingredient_feature(dataset, inputs: dict, graph: dict, config: Config):
             )
         )(x)
         vocabulary_size = len(ingredients_vocab)
-        print(f"{feature_name}: {vocabulary_size=}")
+        print(f"{feature_name}: vocabulary_size={vocabulary_size}")
     else:
         ingredients_vocab = get_vocabulary(
             flat_batch(
@@ -208,7 +208,7 @@ def add_nutriment_features(dataset, inputs: dict, graph: dict, config: Config):
         )
 
     for nutriment_name in NUTRIMENT_NAMES:
-        print(f"{nutriment_name=}")
+        print(f"nutriment_name={nutriment_name}")
         discretization_layer = layers.Discretization(
             output_mode="one_hot", num_bins=config.nutriment_num_bins
         )
@@ -348,7 +348,9 @@ def main(
     print("Fetching taxonomies")
     category_taxonomy = get_taxonomy("category", offline=True)
     ingredient_taxonomy = get_taxonomy("ingredient", offline=True)
-    print(f"{len(ingredient_taxonomy)=}, {len(category_taxonomy)=}")
+    print(
+        f"ingredient_taxonomy_count={len(ingredient_taxonomy)}, category_taxonomy_count={len(category_taxonomy)}"
+    )
 
     print("Downloading and preparing dataset...")
     builder = tfds.builder("off_categories")
@@ -406,7 +408,7 @@ def main(
             _transform, num_parallel_calls=tf.data.AUTOTUNE, deterministic=True
         )
 
-    print(f"{len(categories_vocab)=}")
+    print(f"categories_vocab_count={len(categories_vocab)}")
 
     # ensure final order is independent of cell execution/insertion order
     features = sorted(inputs.keys())
