@@ -531,7 +531,7 @@ def main(
     extra_cols_test = as_dataframe(
         select_features(
             ds_test,
-            ["code", "product_name", "ingredients_tags"] + list(NUTRIMENT_NAMES),
+            ["code", "product_name"] + list(NUTRIMENT_NAMES),
         )
     )
 
