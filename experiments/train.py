@@ -286,7 +286,7 @@ def main(
         True, help="If True, add nutriments as input feature."
     ),
     epochs: int = typer.Option(50, help="Number of epochs to train"),
-    batch_size: int = typer.Option(50, help="Batch size during training"),
+    batch_size: int = typer.Option(128, help="Batch size during training"),
     learning_rate: float = typer.Option(0.001, help="Learning rate (Adam optimizer)"),
     dense_layer_dropout: float = typer.Option(
         0.2, help="Dropout value of final dense layers"
