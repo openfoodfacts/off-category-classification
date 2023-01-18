@@ -1,7 +1,6 @@
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 PROJECT_DIR = Path("..").absolute().resolve()
 sys.path.append(
@@ -303,7 +302,7 @@ def main(
     tracker = EmissionsTracker(
         log_level="WARNING",
         save_to_api=True,
-        experiment_id="6d2c8401-afba-42de-9600-6e95bea5fd80"
+        experiment_id="6d2c8401-afba-42de-9600-6e95bea5fd80",
     )
     tracker.start()
 
@@ -477,11 +476,19 @@ def main(
     SAVED_MODEL_DIR = MODEL_DIR / "saved_model"
 
     @tf.function
-    def serving_func(*args, **kwargs):
-        preds = model(*args, **kwargs)
+    def serving_func(model_spec, categories_vocab):
+        model_args, model_kwargs = model_spec
+        preds = model(*model_args, **model_kwargs)
         return top_labeled_predictions(preds, categories_vocab, k=len(categories_vocab))
 
-    save_model(SAVED_MODEL_DIR, model, categories_vocab, serving_func, include_optimizer=False)
+    save_model(
+        SAVED_MODEL_DIR,
+        model,
+        categories_vocab,
+        serving_func,
+        serving_func_kwargs={"categories_vocab": categories_vocab},
+        include_optimizer=False,
+    )
 
     m, labels = load_model(SAVED_MODEL_DIR)
 

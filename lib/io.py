@@ -1,6 +1,6 @@
 import pathlib
 import tempfile
-from typing import List
+from typing import Dict, List, Optional
 
 import tensorflow as tf
 
@@ -10,6 +10,7 @@ def save_model(
     model: tf.keras.Model,
     labels_vocab: List[str],
     serving_func: tf.function = None,
+    serving_func_kwargs: Optional[Dict] = None,
     **kwargs,
 ):
     """
@@ -41,8 +42,10 @@ def save_model(
 
     signatures = None
     if serving_func:
-        arg_specs, kwarg_specs = model.save_spec()
-        concrete_func = serving_func.get_concrete_function(*arg_specs, **kwarg_specs)
+        serving_func_kwargs = serving_func_kwargs or {}
+        concrete_func = serving_func.get_concrete_function(
+            model.save_spec(), **serving_func_kwargs
+        )
         signatures = {"serving_default": concrete_func}
 
     model.save(str(path), signatures=signatures, **kwargs)
