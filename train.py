@@ -1,37 +1,22 @@
-import json
-import sys
-from pathlib import Path
-
-PROJECT_DIR = Path("..").absolute().resolve()
-sys.path.append(
-    str(PROJECT_DIR)
-)  # append a relative path to the top package to the search path
-
-
-# codecarbon - start tracking
-from codecarbon import EmissionsTracker
 import dataclasses
+import json
 import random
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 import tensorflow_addons as tfa
 import tensorflow_datasets as tfds
+import typer
+from codecarbon import EmissionsTracker
 from tensorflow.keras import callbacks, layers
 from tensorflow.keras.utils import plot_model
-import typer
 
 import datasets.off_categories
 from lib.constant import NUTRIMENT_NAMES
-from lib.dataset import (
-    as_dataframe,
-    flat_batch,
-    get_vocabulary,
-    load_dataset,
-    select_feature,
-    select_features,
-)
+from lib.dataset import (as_dataframe, flat_batch, get_vocabulary,
+                         load_dataset, select_feature, select_features)
 from lib.directories import init_model_dir
 from lib.io import load_model, save_model
 from lib.metrics import PrecisionWithAverage, RecallWithAverage
@@ -39,6 +24,7 @@ from lib.model import top_labeled_predictions, top_predictions_table
 from lib.taxonomy import get_taxonomy
 
 PREPROC_BATCH_SIZE = 25_000  # some large value, only affects execution time
+PROJECT_DIR = Path(__file__).parent.absolute().resolve()
 
 
 @dataclasses.dataclass
