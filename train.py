@@ -471,6 +471,7 @@ def main(
                 monitor="val_f1_score_micro",
                 save_best_only=True,
                 save_format="tf",
+                mode="max",
             ),
             callbacks.CSVLogger(str(MODEL_DIR / "training.log")),
             callbacks.History(),
