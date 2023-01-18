@@ -2,7 +2,7 @@ import dataclasses
 import json
 import random
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -296,6 +296,12 @@ def main(
         help="If True, uses a cosine scheduler, use a constant learning rate otherwise.",
     ),
     name: Optional[str] = typer.Option(None, help="Name of the experiment."),
+    notes: Optional[str] = typer.Option(
+        None, help="Description of the experiment (for W&B tracking)."
+    ),
+    tags: Optional[List[str]] = typer.Option(
+        None, help="Tags of the experiment (for W&B tracking)."
+    ),
 ):
     MODEL_BASE_DIR = PROJECT_DIR / "experiments" / "trainings"
     MODEL_BASE_DIR.mkdir(parents=True, exist_ok=True)
@@ -349,6 +355,8 @@ def main(
         project="product-categorization",
         name=config.name,
         config=dataclasses.asdict(config),
+        notes=notes,
+        tags=tags,
     )
 
     with (MODEL_DIR / "config.json").open("w") as f:
