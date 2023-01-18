@@ -303,8 +303,7 @@ def main(
     tracker = EmissionsTracker(
         log_level="WARNING",
         save_to_api=True,
-        experiment_id="6d2c8401-afba-42de-9600-6e95bea5fd80",
-        output_file=str(MODEL_BASE_DIR / "emissions.csv")
+        experiment_id="6d2c8401-afba-42de-9600-6e95bea5fd80"
     )
     tracker.start()
 
