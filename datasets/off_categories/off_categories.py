@@ -34,7 +34,9 @@ https://openfoodfacts.org/data/dataforgood2022/big/predict_categories_dataset_do
 _RELEASE_NOTES = {"2.0.0": "DataForGood 2022 dataset", "1.0.0": "Initial release"}
 
 # Don't forget to run `tfds build --register_checksums` when changing the data source
-_DATA_URL = "https://openfoodfacts.org/data/dataforgood2022/big/predict_categories_dataset_products.jsonl.gz"
+_DATA_URLS = {
+    "product_data": "https://openfoodfacts.org/data/dataforgood2022/big/predict_categories_dataset_products.jsonl.gz",
+}
 
 TEXT_EMBEDDING_DIM = 768
 PRODUCT_NAME_MAX_LENGTH = 40
@@ -98,12 +100,13 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         # Downloads the data and defines the splits
-        paths = dl_manager.download({"train": _DATA_URL})
-        return {s: self._generate_examples(p) for s, p in paths.items()}
+        paths = dl_manager.download(_DATA_URLS)
+        return {"train": self._generate_examples(paths)}
 
-    def _generate_examples(self, path):
+    def _generate_examples(self, paths):
+        product_data_path = paths["product_data"]
         # Yields (key, example) tuples from the dataset
-        for i, item in enumerate(OffCategories._read_json(path)):
+        for i, item in enumerate(OffCategories._read_json(product_data_path)):
             if _LABEL not in item:
                 continue
             features = {
