@@ -213,7 +213,7 @@ def add_ingredient_ocr_feature(dataset, inputs: dict, graph: dict, config: Confi
         add_pad_token=False,
         add_oov_token=True,
     )
-    print(f"ingredients vocabulary size: {len(ingredients_vocab)}")
+    print(f"ingredients ocr vocabulary size: {len(ingredients_vocab)}")
     ingredients_lookup_layer = layers.StringLookup(
         vocabulary=ingredients_vocab,
         num_oov_indices=1,
@@ -356,7 +356,7 @@ def main(
     VAL_SPLIT = "train[80%:90%]"
     TEST_SPLIT = "train[90%:]"
 
-    MODEL_DIR = init_model_dir(MODEL_BASE_DIR / "model")
+    MODEL_DIR = init_model_dir(MODEL_BASE_DIR / name if name else "model")
 
     config = Config(
         name=name or MODEL_DIR.name,
