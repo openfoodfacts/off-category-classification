@@ -50,6 +50,7 @@ class Config:
     add_nutriment_input: bool
     nutriment_num_bins: int
     ingredient_min_freq: int
+    ocr_ingredient_min_freq: int
     ingredient_embedding_size: int
     ingredient_output_size: int
     ingredient_recurrent: bool
@@ -197,6 +198,32 @@ def add_ingredient_feature(dataset, inputs: dict, graph: dict, config: Config):
     graph[feature_name] = ingredients_graph
 
 
+def add_ocr_ingredient_feature(dataset, inputs: dict, graph: dict, config: Config):
+    feature_name = "ocr_ingredients_tags"
+    ingredients_input = tf.keras.Input(
+        shape=(None,), dtype=tf.string, name=feature_name
+    )
+
+    ingredients_vocab = get_vocabulary(
+        flat_batch(
+            select_feature(dataset, feature_name), batch_size=PREPROC_BATCH_SIZE
+        ),
+        min_freq=config.ocr_ingredient_min_freq,
+        add_pad_token=False,
+        add_oov_token=True,
+    )
+    print(f"ingredients vocabulary size: {len(ingredients_vocab)}")
+    ingredients_lookup_layer = layers.StringLookup(
+        vocabulary=ingredients_vocab,
+        num_oov_indices=1,
+        output_mode="multi_hot",
+        mask_token="",
+    )
+    ingredients_graph = ingredients_lookup_layer(ingredients_input)
+    inputs[feature_name] = ingredients_input
+    graph[feature_name] = ingredients_graph
+
+
 def add_nutriment_features(dataset, inputs: dict, graph: dict, config: Config):
     for feature_name in NUTRIMENT_NAMES:
         inputs[feature_name] = tf.keras.Input(
@@ -237,6 +264,11 @@ def main(
     ingredient_min_freq: int = typer.Option(
         3,
         help="Minimum number of occurences in train dataset for an ingredient to be considered as input",
+    ),
+    ocr_ingredient_min_freq: int = typer.Option(
+        3,
+        help="Minimum number of occurences in train dataset for an ingredient from OCR text to be "
+        "considered as input",
     ),
     ingredient_embedding_size: int = typer.Option(
         64, help="Size of the output embedding for ingredient input"
@@ -335,6 +367,7 @@ def main(
         add_nutriment_input=add_nutriment_input,
         nutriment_num_bins=nutriment_num_bins,
         ingredient_min_freq=ingredient_min_freq,
+        ocr_ingredient_min_freq=ocr_ingredient_min_freq,
         ingredient_embedding_size=ingredient_embedding_size,
         ingredient_output_size=ingredient_output_size,
         ingredient_recurrent=ingredient_recurrent,
