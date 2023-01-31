@@ -46,6 +46,7 @@ class Config:
     random_seed: int
     category_min_count: int
     add_product_name_input: bool
+    add_ocr_ingredient_input: bool
     add_ingredient_input: bool
     add_nutriment_input: bool
     nutriment_num_bins: int
