@@ -310,6 +310,9 @@ def main(
     add_ingredient_input: bool = typer.Option(
         True, help="If True, add ingredients as input feature."
     ),
+    add_ocr_ingredient_input: bool = typer.Option(
+        False, help="If True, add OCR ingredients as input feature."
+    ),
     add_nutriment_input: bool = typer.Option(
         True, help="If True, add nutriments as input feature."
     ),
@@ -365,6 +368,7 @@ def main(
         add_product_name_input=add_product_name_input,
         add_ingredient_input=add_ingredient_input,
         add_nutriment_input=add_nutriment_input,
+        add_ocr_ingredient_input=add_ocr_ingredient_input,
         nutriment_num_bins=nutriment_num_bins,
         ingredient_min_freq=ingredient_min_freq,
         ocr_ingredient_min_freq=ocr_ingredient_min_freq,
@@ -427,6 +431,8 @@ def main(
     if add_ingredient_input:
         print("Adding ingredient input")
         add_ingredient_feature(ds, inputs, input_graphs, config)
+    if add_ocr_ingredient_input:
+        add_ocr_ingredient_feature(ds, inputs, input_graphs, config)
 
     labels = "categories_tags"
     print("Generating category vocabulary")
