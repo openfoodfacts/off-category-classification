@@ -1,7 +1,7 @@
 import functools
 import gzip
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import orjson
 import tensorflow as tf
@@ -24,7 +24,8 @@ class Feature:
     default_value: Any
     input_field: str = None  # use feature name if None
     transform: Optional[Callable] = None
-    source: Literal["product", "ocr"] = "product"
+    # products or ocr
+    source: str = "product"
 
 
 _DESCRIPTION = """
