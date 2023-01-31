@@ -46,12 +46,12 @@ class Config:
     random_seed: int
     category_min_count: int
     add_product_name_input: bool
-    add_ocr_ingredient_input: bool
+    add_ingredient_ocr_input: bool
     add_ingredient_input: bool
     add_nutriment_input: bool
     nutriment_num_bins: int
     ingredient_min_freq: int
-    ocr_ingredient_min_freq: int
+    ingredient_ocr_min_freq: int
     ingredient_embedding_size: int
     ingredient_output_size: int
     ingredient_recurrent: bool
@@ -199,8 +199,8 @@ def add_ingredient_feature(dataset, inputs: dict, graph: dict, config: Config):
     graph[feature_name] = ingredients_graph
 
 
-def add_ocr_ingredient_feature(dataset, inputs: dict, graph: dict, config: Config):
-    feature_name = "ocr_ingredients_tags"
+def add_ingredient_ocr_feature(dataset, inputs: dict, graph: dict, config: Config):
+    feature_name = "ingredients_ocr_tags"
     ingredients_input = tf.keras.Input(
         shape=(None,), dtype=tf.string, name=feature_name
     )
@@ -209,7 +209,7 @@ def add_ocr_ingredient_feature(dataset, inputs: dict, graph: dict, config: Confi
         flat_batch(
             select_feature(dataset, feature_name), batch_size=PREPROC_BATCH_SIZE
         ),
-        min_freq=config.ocr_ingredient_min_freq,
+        min_freq=config.ingredient_ocr_min_freq,
         add_pad_token=False,
         add_oov_token=True,
     )
@@ -266,7 +266,7 @@ def main(
         3,
         help="Minimum number of occurences in train dataset for an ingredient to be considered as input",
     ),
-    ocr_ingredient_min_freq: int = typer.Option(
+    ingredient_ocr_min_freq: int = typer.Option(
         3,
         help="Minimum number of occurences in train dataset for an ingredient from OCR text to be "
         "considered as input",
@@ -311,7 +311,7 @@ def main(
     add_ingredient_input: bool = typer.Option(
         True, help="If True, add ingredients as input feature."
     ),
-    add_ocr_ingredient_input: bool = typer.Option(
+    add_ingredient_ocr_input: bool = typer.Option(
         False, help="If True, add OCR ingredients as input feature."
     ),
     add_nutriment_input: bool = typer.Option(
@@ -369,10 +369,10 @@ def main(
         add_product_name_input=add_product_name_input,
         add_ingredient_input=add_ingredient_input,
         add_nutriment_input=add_nutriment_input,
-        add_ocr_ingredient_input=add_ocr_ingredient_input,
+        add_ingredient_ocr_input=add_ingredient_ocr_input,
         nutriment_num_bins=nutriment_num_bins,
         ingredient_min_freq=ingredient_min_freq,
-        ocr_ingredient_min_freq=ocr_ingredient_min_freq,
+        ingredient_ocr_min_freq=ingredient_ocr_min_freq,
         ingredient_embedding_size=ingredient_embedding_size,
         ingredient_output_size=ingredient_output_size,
         ingredient_recurrent=ingredient_recurrent,
@@ -432,8 +432,8 @@ def main(
     if add_ingredient_input:
         print("Adding ingredient input")
         add_ingredient_feature(ds, inputs, input_graphs, config)
-    if add_ocr_ingredient_input:
-        add_ocr_ingredient_feature(ds, inputs, input_graphs, config)
+    if add_ingredient_ocr_input:
+        add_ingredient_ocr_feature(ds, inputs, input_graphs, config)
 
     labels = "categories_tags"
     print("Generating category vocabulary")
