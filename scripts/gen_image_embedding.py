@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Optional, Set
+from typing import Dict, List, Optional, Set
 
 import h5py
 import numpy as np
@@ -66,10 +66,10 @@ class JsonFormatter(logging.Formatter):
 
     def __init__(
         self,
-        fmt_dict: dict = None,
+        fmt_dict: Dict = None,
         time_format: str = "%Y-%m-%dT%H:%M:%S",
         msec_format: str = "%s.%03dZ",
-        default_fields: Optional[list[str]] = None,
+        default_fields: Optional[List[str]] = None,
     ):
         self.fmt_dict = fmt_dict if fmt_dict is not None else {"message": "message"}
         self.default_time_format = time_format
@@ -109,11 +109,14 @@ class JsonFormatter(logging.Formatter):
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-json_handler = logging.FileHandler("generate_embeddings.log")
+json_handler = logging.FileHandler("run.log")
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.WARNING)
 json_formatter = JsonFormatter()
 json_handler.setFormatter(json_formatter)
 json_handler.setLevel(logging.INFO)
 logger.addHandler(json_handler)
+logger.addHandler(stream_handler)
 
 # Define a custom dataset class that downloads the logos
 class ImageDataset(Dataset):
@@ -168,6 +171,7 @@ def download_image(barcode: str, image_id):
     try:
         image = Image.open(raw_image)
         image.load()
+        return image
     except Exception as e:
         logger.error(
             "could not load image", extra={"source_image": source_image}, exc_info=e
@@ -199,6 +203,7 @@ def main(
     dataset_path: Path, output_path: Path, batch_size: int = 2, num_workers: int = 1
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info("Using device: %s", device)
     model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     processor = CLIPImageProcessor()
     dataset = ImageDataset(dataset_path, get_seen_set(output_path))
@@ -207,7 +212,7 @@ def main(
         batch_size=batch_size,
         num_workers=num_workers,
         collate_fn=collate_fn,
-        pin_memory=True,
+        pin_memory=False,
     )
     output_exists = output_path.is_file()
 
@@ -242,6 +247,9 @@ def main(
 
 def generate_embedding_batch(data_loader, model, processor, device):
     for batch in data_loader:
+        if not batch:
+            logger.warning("empty batch")
+            continue
         image_ids, images = zip(*batch)
         id_batch = np.array(image_ids)
         embedding_batch = embed_images(images, processor, model, device)
