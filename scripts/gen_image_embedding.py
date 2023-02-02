@@ -231,7 +231,7 @@ def main(
             id_dset = f["external_id"]
             non_zero_indexes = np.flatnonzero(id_dset[:])
             offset = int(non_zero_indexes[-1]) + 1
-            assert id_dset[offset] == 0
+            assert id_dset[offset] == b""
 
         logger.info(f"offset is %s", offset)
 
