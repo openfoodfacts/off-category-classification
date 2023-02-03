@@ -2,8 +2,9 @@ import itertools
 import re
 import string
 from collections import defaultdict
-from typing import Dict, List, Optional, Pattern, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
+import numpy as np
 from flashtext import KeywordProcessor
 
 from lib.taxonomy import Taxonomy
@@ -85,9 +86,20 @@ def transform_nutrition_input(value: Optional[float], nutriment_name: str) -> fl
 MULTIPLE_SPACES_REGEX = re.compile(r" {2,}")
 
 
-def transform_ocr_ingredients_input(
+def transform_ingredients_ocr_tags(values: List[str]) -> List[str]:
+    seen = set()
+    result = []
+    for item in values:
+        node_id, _ = item.split("|", maxsplit=1)
+        if node_id in seen:
+            continue
+        result.append(node_id)
+    return result
+
+
+def extract_ocr_ingredients(
     value: Dict, processor: KeywordProcessor, debug: bool = False
-):
+) -> List[str]:
     texts = []
     for ocr_data in value.values():
         text = ocr_data["text"].replace("\n", " ")
@@ -224,3 +236,29 @@ def extract_ingredient_from_text(
     """
     text = fold(text.lower())
     return processor.extract_keywords(text, span_info=True)
+
+
+def transform_image_embeddings(
+    image_embeddings: Dict[int, np.ndarray], max_images: int, embedding_dim: int
+):
+    embeddings_batch = []
+    # Sort by descending key orders
+    sorted_image_ids = sorted(image_embeddings.keys(), reverse=True)[:max_images]
+    # Only take `max_images` most recent
+    for image_id in sorted_image_ids:
+        embeddings_batch.append(image_embeddings[image_id])
+
+    # Fill with "pad" zero-valued arrays
+    embeddings_batch += [np.zeros(embedding_dim, dtype=np.float32)] * (
+        max_images - len(sorted_image_ids)
+    )
+    return np.stack(embeddings_batch)
+
+
+def transform_image_embeddings_mask(
+    image_embeddings: Dict[int, np.ndarray], max_images: int
+) -> np.ndarray:
+    number_images = min(len(image_embeddings.keys()), max_images)
+    mask = np.zeros(max_images, dtype=np.int64)
+    mask[:number_images] = 1
+    return mask

@@ -1,3 +1,6 @@
+MAX_IMAGE_EMBEDDING = 10
+IMAGE_EMBEDDING_DIM = 512
+
 NUTRIMENT_NAMES = (
     "fat",
     "saturated_fat",

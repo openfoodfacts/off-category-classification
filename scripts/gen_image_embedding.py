@@ -123,14 +123,17 @@ class ImageDataset(Dataset):
     def __init__(self, dataset_path: Path, seen_set: Optional[set] = None):
         seen_set = seen_set or set()
         self.image_ids = []
+        skipped = 0
         with gzip.open(dataset_path, "rt") as f:
             for barcode, image_ids in map(json.loads, f):
                 for image_id in image_ids:
                     key = f"{barcode}_{image_id}"
                     if key in seen_set:
+                        skipped += 1
                         continue
                     seen_set.add(key)
                     self.image_ids.append((barcode, image_id))
+        logger.info("%d items skipped (already done)", skipped)
 
     def __len__(self):
         return len(self.image_ids)
@@ -151,7 +154,7 @@ def get_seen_set(hdf5_path: Path) -> Set[str]:
         return set()
     logger.info("fetching seen set...")
     with h5py.File(hdf5_path, "r") as f:
-        return set(f["external_id"])
+        return set(x.decode() for x in f["external_id"][:])
 
 
 def download_image(barcode: str, image_id):
@@ -171,12 +174,20 @@ def download_image(barcode: str, image_id):
     try:
         image = Image.open(raw_image)
         image.load()
-        return image
     except Exception as e:
         logger.error(
             "could not load image", extra={"source_image": source_image}, exc_info=e
         )
         return None
+    else:
+        if any(size <= 10 for size in image.size):
+            logger.warning(
+                "image too small",
+                extra={"source_image": source_image, "size": str(list(image.size))},
+            )
+            return None
+
+        return image
 
 
 def embed_images(images, processor, model, device):
