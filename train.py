@@ -312,7 +312,7 @@ def main(
         True, help="If True, add ingredients as input feature."
     ),
     add_ingredient_ocr_input: bool = typer.Option(
-        False, help="If True, add OCR ingredients as input feature."
+        True, help="If True, add OCR ingredients as input feature."
     ),
     add_nutriment_input: bool = typer.Option(
         True, help="If True, add nutriments as input feature."
