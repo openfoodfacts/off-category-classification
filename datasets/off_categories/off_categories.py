@@ -53,6 +53,7 @@ _RELEASE_NOTES = {
 _DATA_URLS = {
     "product_data": "https://openfoodfacts.org/data/dataforgood2022/big/v3/predict_categories_dataset_products.jsonl.gz",
     "image_ocr": "https://openfoodfacts.org/data/dataforgood2022/big/v3/predict_categories_dataset_ocrs.jsonl.gz",
+    "image_embedding": "https://openfoodfacts.org/data/dataforgood2022/big/v3/predict_categories_dataset_image_embeddings.hdf5",
 }
 
 TEXT_EMBEDDING_DIM = 768
