@@ -98,9 +98,9 @@ def build_attention_over_sequence_layer(
 ):
     image_embedding_input = tf.keras.Input(shape=[None, embedding_dim], name=input_name)
     image_embedding_mask_input = tf.keras.Input(shape=[None], name=f"{input_name}_mask")
-    image_embedding_full_mask = tf.keras.layers.Lambda(generate_mask_matrix)(
-        image_embedding_mask_input
-    )
+    image_embedding_full_mask = tf.keras.layers.Lambda(
+        generate_mask_matrix, name="attention_mask_builder"
+    )(image_embedding_mask_input)
     attention_layer = tf.keras.layers.MultiHeadAttention(
         num_heads=num_heads, key_dim=key_dim
     )
@@ -113,7 +113,9 @@ def build_attention_over_sequence_layer(
     average_output = tf.keras.layers.GlobalAveragePooling1D()(
         attention_output, image_embedding_mask_input
     )
-    average_output = tf.keras.layers.Lambda(replace_nan_by_zero)(average_output)
+    average_output = tf.keras.layers.Lambda(replace_nan_by_zero, name="nan_remover")(
+        average_output
+    )
     return [image_embedding_input, image_embedding_mask_input], [
         attention_output,
         attention_scores,

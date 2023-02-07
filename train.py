@@ -481,9 +481,12 @@ def main(
 
     labels = "categories_tags"
     print("Generating category vocabulary")
-    categories_vocab = get_vocabulary(
+    category_vocab = get_vocabulary(
         flat_batch(select_feature(ds, labels), batch_size=PREPROC_BATCH_SIZE),
         min_freq=config.category_min_count,
+    )
+    category_vocab_constant = tf.constant(
+        category_vocab, dtype="string", name="category_vocab"
     )
 
     # StringLookup(output_mode='multi_hot') mode requires num_oov_indices >= 1.
@@ -493,8 +496,9 @@ def main(
     # based on a vocabulary with OOV (e.g. vocabulary_size()). Keep this in mind when
     # mapping predictions back to the original vocabulary.
     categories_multihot = layers.StringLookup(
-        vocabulary=categories_vocab, output_mode="multi_hot", num_oov_indices=1
+        vocabulary=category_vocab_constant, output_mode="multi_hot", num_oov_indices=1
     )
+    category_count = len(category_vocab_constant)
 
     def categories_encode(ds: tf.data.Dataset):
         @tf.function
@@ -509,7 +513,7 @@ def main(
             _transform, num_parallel_calls=tf.data.AUTOTUNE, deterministic=True
         )
 
-    print(f"categories_vocab_count={len(categories_vocab)}")
+    print(f"category_count={category_count}")
 
     # ensure final order is independent of cell execution/insertion order
     features = sorted(inputs.keys())
@@ -523,7 +527,7 @@ def main(
     x = layers.Dense(config.dense_layer_output_size)(x)
     x = layers.Dropout(config.dense_layer_dropout)(x)
     x = layers.Activation("relu")(x)
-    output = layers.Dense(len(categories_vocab), activation="sigmoid")(x)
+    output = layers.Dense(category_count, activation="sigmoid", name="score")(x)
     model = tf.keras.Model(inputs=[inputs[k] for k in features], outputs=[output])
 
     ds_train = (
@@ -545,7 +549,7 @@ def main(
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=config.label_smoothing),
-        metrics=get_metrics(threshold=0.5, num_classes=len(categories_vocab)),
+        metrics=get_metrics(threshold=0.5, num_classes=category_count),
     )
     model.summary()
 
@@ -595,10 +599,10 @@ def main(
     SAVED_MODEL_DIR = MODEL_DIR / "saved_model"
 
     @tf.function
-    def serving_func(model, model_spec, categories_vocab):
+    def serving_func(model, model_spec, category_vocab):
         model_args, model_kwargs = model_spec
         preds = model(*model_args, **model_kwargs)
-        return top_labeled_predictions(preds, categories_vocab, k=len(categories_vocab))
+        return preds, category_vocab
 
     checkpoint_path = get_best_checkpoint(WEIGHTS_DIR)
     if checkpoint_path is not None:
@@ -610,9 +614,9 @@ def main(
     save_model(
         SAVED_MODEL_DIR,
         model,
-        categories_vocab,
+        category_vocab,
         serving_func,
-        serving_func_kwargs={"categories_vocab": categories_vocab},
+        serving_func_kwargs={"category_vocab": category_vocab_constant},
         include_optimizer=False,
     )
 
