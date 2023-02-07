@@ -539,7 +539,7 @@ def main(
     if add_ingredient_ocr_input:
         print("Adding ingredient OCR input")
         add_ingredient_ocr_feature(ds, inputs, input_graphs, config)
-    if add_image_embedding_feature:
+    if add_image_embedding_input:
         print("Adding image embeddings input")
         add_image_embedding_feature(inputs, input_graphs, config)
 
