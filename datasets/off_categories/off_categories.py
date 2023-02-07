@@ -222,7 +222,8 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
                         "product and ocr data files are not synchronized: "
                         f"{product['code']} != {ocr['code']}"
                     )
-                if _LABEL not in product:
+                if _LABEL not in product or not product.get("product_name"):
+                    # Remove items without product name or categories
                     continue
                 barcode = product["code"]
                 image_embeddings = embedding_ds[barcode]
