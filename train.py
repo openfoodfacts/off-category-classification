@@ -391,16 +391,6 @@ def main(
     tags: Optional[List[str]] = typer.Option(
         None, help="Tags of the experiment (for W&B tracking)."
     ),
-    split_check_dir: Optional[Path] = typer.Option(
-        None,
-        help="A directory containing 3 text files: train.txt, val.txt and "
-        "test.txt, that contain each an ordered list of barcodes "
-        "corresponding to the split. If provided, a check will be performed "
-        "to make sure the generated split match with the provided ones.",
-        dir_okay=True,
-        file_okay=False,
-        exists=True,
-    ),
     dry_run: bool = typer.Option(
         False, help="Perform a dry run (no training, no integration logging)"
     ),
@@ -430,7 +420,7 @@ def main(
     print("checking training splits...")
     split_barcodes = {}
     SPLIT_DIR = MODEL_BASE_DIR / "splits"
-    SPLIT_DIR.mkdir()
+    missing_splits = not SPLIT_DIR.exists()
     for split_name, split_command in (
         ("train", TRAIN_SPLIT),
         ("val", VAL_SPLIT),
@@ -443,10 +433,12 @@ def main(
         if len(split_barcodes[split_name]) != len(barcodes):
             raise ValueError("duplicate products in %s split", split_name)
 
-        (SPLIT_DIR / f"{split_name}.txt").write_text("\n".join(barcodes))
-        if split_check_dir is not None:
+        if missing_splits:
+            SPLIT_DIR.mkdir(exist_ok=True)
+            (SPLIT_DIR / f"{split_name}.txt").write_text("\n".join(barcodes))
+        else:
             expected_barcodes = (
-                (split_check_dir / f"{split_name}.txt").read_text().splitlines()
+                (SPLIT_DIR / f"{split_name}.txt").read_text().splitlines()
             )
             if barcodes != expected_barcodes:
                 raise ValueError(
