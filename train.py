@@ -429,6 +429,8 @@ def main(
 
     print("checking training splits...")
     split_barcodes = {}
+    SPLIT_DIR = MODEL_BASE_DIR / "splits"
+    SPLIT_DIR.mkdir()
     for split_name, split_command in (
         ("train", TRAIN_SPLIT),
         ("val", VAL_SPLIT),
@@ -441,6 +443,7 @@ def main(
         if len(split_barcodes[split_name]) != len(barcodes):
             raise ValueError("duplicate products in %s split", split_name)
 
+        (SPLIT_DIR / f"{split_name}.txt").write_text("\n".join(barcodes))
         if split_check_dir is not None:
             expected_barcodes = (
                 (split_check_dir / f"{split_name}.txt").read_text().splitlines()
@@ -449,9 +452,6 @@ def main(
                 raise ValueError(
                     "barcodes for split %s did not match reference", split_name
                 )
-        else:
-            Path("split_reference").mkdir(exist_ok=True)
-            Path(f"split_reference/{split_name}.txt").write_text("\n".join(barcodes))
 
     for split_1, split_2 in (("train", "val"), ("train", "test"), ("val", "test")):
         if split_barcodes[split_1].intersection(split_barcodes[split_2]):
@@ -676,10 +676,12 @@ def main(
     )
 
     m, labels = load_model(SAVED_MODEL_DIR)
-
+    PREDICTION_DIR = MODEL_DIR / "predictions"
+    PREDICTION_DIR.mkdir()
     for split_name, split_command in (("val", VAL_SPLIT), ("test", TEST_SPLIT)):
         split_ds = load_dataset("off_categories", split=split_command)
         preds = m.predict(split_ds.padded_batch(config.batch_size))
+        np.save(PREDICTION_DIR / split_name, preds, allow_pickle=False)
         # This is the function exported as the default serving function in our saved model
         top_preds = top_labeled_predictions(preds, labels, k=10)
         # Same data, but pretty
@@ -696,7 +698,7 @@ def main(
 
         output_df = pd.concat([extra_cols, pred_table], axis=1)
         output_df.to_csv(
-            MODEL_DIR / f"{split_name}_predictions.tsv", sep="\t", index=False
+            PREDICTION_DIR / f"{split_name}_top_predictions.tsv", sep="\t", index=False
         )
         if not m._is_compiled:
             m.compile(
@@ -717,9 +719,6 @@ def main(
         print(best_model_metrics)
         if wandb_run:
             wandb.log(best_model_metrics)
-            wandb_run.log(
-                {f"predictions_{split_name}": wandb.Table(dataframe=output_df)}
-            )
 
     if tracker:
         # codecarbon - stop tracking
