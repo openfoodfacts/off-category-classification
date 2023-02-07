@@ -290,7 +290,7 @@ def extract_barcodes(ds) -> List[str]:
 def serving_func(model, model_spec, category_vocab):
     model_args, model_kwargs = model_spec
     preds = model(*model_args, **model_kwargs)
-    return preds, category_vocab
+    return preds, tf.constant(category_vocab, dtype="string")
 
 
 def main(
@@ -549,9 +549,6 @@ def main(
         flat_batch(select_feature(ds, labels), batch_size=PREPROC_BATCH_SIZE),
         min_freq=config.category_min_count,
     )
-    category_vocab_constant = tf.constant(
-        category_vocab, dtype="string", name="category_vocab"
-    )
 
     # StringLookup(output_mode='multi_hot') mode requires num_oov_indices >= 1.
     # We don't want OOVs in the categories_tags output layer, since it wouldn't make
@@ -560,9 +557,9 @@ def main(
     # based on a vocabulary with OOV (e.g. vocabulary_size()). Keep this in mind when
     # mapping predictions back to the original vocabulary.
     categories_multihot = layers.StringLookup(
-        vocabulary=category_vocab_constant, output_mode="multi_hot", num_oov_indices=1
+        vocabulary=category_vocab, output_mode="multi_hot", num_oov_indices=1
     )
-    category_count = len(category_vocab_constant)
+    category_count = len(category_vocab)
 
     def categories_encode(ds: tf.data.Dataset):
         @tf.function
@@ -674,7 +671,7 @@ def main(
         model,
         category_vocab,
         serving_func,
-        serving_func_kwargs={"category_vocab": category_vocab_constant},
+        serving_func_kwargs={"category_vocab": category_vocab},
         include_optimizer=False,
     )
 
