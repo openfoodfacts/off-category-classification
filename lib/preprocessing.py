@@ -94,6 +94,7 @@ def transform_ingredients_ocr_tags(values: List[str]) -> List[str]:
         if node_id in seen:
             continue
         result.append(node_id)
+        seen.add(node_id)
     return result
 
 
