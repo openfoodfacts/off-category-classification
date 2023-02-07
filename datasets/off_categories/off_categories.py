@@ -44,6 +44,7 @@ https://openfoodfacts.org/data/dataforgood2022/big/predict_categories_dataset_do
 """
 
 _RELEASE_NOTES = {
+    "4.0.0": "Dataset with pre-shuffling",
     "3.0.0": "Deduped dataset",
     "2.0.0": "DataForGood 2022 dataset",
     "1.0.0": "Initial release",
@@ -181,7 +182,7 @@ class ImageEmbeddingDataset(ContextDecorator):
 
 
 class OffCategories(tfds.core.GeneratorBasedBuilder):
-    VERSION = tfds.core.Version("2.0.0")
+    VERSION = tfds.core.Version("4.0.0")
     RELEASE_NOTES = _RELEASE_NOTES
 
     def _info(self) -> tfds.core.DatasetInfo:
