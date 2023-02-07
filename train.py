@@ -11,6 +11,7 @@ import tensorflow_addons as tfa
 import tensorflow_datasets as tfds
 import typer
 from codecarbon import EmissionsTracker
+from rich import print
 from tensorflow.keras import callbacks, layers
 from tensorflow.keras.utils import plot_model
 from wandb.keras import WandbMetricsLogger
@@ -277,6 +278,21 @@ def set_random_seed(seed):
     random.seed(seed)
 
 
+def extract_barcodes(ds) -> List[str]:
+    "Extract all barcodes in sequential order from a dataset."
+    barcodes = []
+    for batch in tfds.as_numpy(select_feature(ds, "code").batch(PREPROC_BATCH_SIZE)):
+        barcodes += [x.decode("utf-8") for x in batch.tolist()]
+    return barcodes
+
+
+@tf.function
+def serving_func(model, model_spec, category_vocab):
+    model_args, model_kwargs = model_spec
+    preds = model(*model_args, **model_kwargs)
+    return preds, category_vocab
+
+
 def main(
     mixed_precision: bool = typer.Option(
         False, help="If True, used mixed precision training"
@@ -375,25 +391,73 @@ def main(
     tags: Optional[List[str]] = typer.Option(
         None, help="Tags of the experiment (for W&B tracking)."
     ),
+    split_check_dir: Optional[Path] = typer.Option(
+        None,
+        help="A directory containing 3 text files: train.txt, val.txt and "
+        "test.txt, that contain each an ordered list of barcodes "
+        "corresponding to the split. If provided, a check will be performed "
+        "to make sure the generated split match with the provided ones.",
+        dir_okay=True,
+        file_okay=False,
+        exists=True,
+    ),
+    dry_run: bool = typer.Option(
+        False, help="Perform a dry run (no training, no integration logging)"
+    ),
 ):
     MODEL_BASE_DIR = PROJECT_DIR / "experiments" / "trainings"
     MODEL_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
-    print("Setting up carbon emission tracking")
-    tracker = EmissionsTracker(
-        log_level="WARNING",
-        save_to_api=True,
-        experiment_id="6d2c8401-afba-42de-9600-6e95bea5fd80",
-        output_file=str(PROJECT_DIR / "experiments/emissions.csv"),
-    )
-    tracker.start()
+    if dry_run:
+        print("[green]Running in DRY RUN mode[/green]")
+        tracker = None
+        wandb_run = None
+    else:
+        print("Setting up carbon emission tracking")
+        tracker = EmissionsTracker(
+            log_level="WARNING",
+            save_to_api=True,
+            experiment_id="6d2c8401-afba-42de-9600-6e95bea5fd80",
+            output_file=str(PROJECT_DIR / "experiments/emissions.csv"),
+        )
+        tracker.start()
 
     # splits are handled by `tfds.load`, see doc for more elaborate ways to sample
     TRAIN_SPLIT = "train[:80%]"
     VAL_SPLIT = "train[80%:90%]"
     TEST_SPLIT = "train[90%:]"
 
-    MODEL_DIR = init_model_dir(MODEL_BASE_DIR / name if name else "model")
+    print("checking training splits...")
+    split_barcodes = {}
+    for split_name, split_command in (
+        ("train", TRAIN_SPLIT),
+        ("val", VAL_SPLIT),
+        ("test", TEST_SPLIT),
+    ):
+        print(f"checking split {split_name}")
+        barcodes = extract_barcodes(load_dataset("off_categories", split=split_command))
+        split_barcodes[split_name] = set(barcodes)
+
+        if len(split_barcodes[split_name]) != len(barcodes):
+            raise ValueError("duplicate products in %s split", split_name)
+
+        if split_check_dir is not None:
+            expected_barcodes = (
+                (split_check_dir / f"{split_name}.txt").read_text().splitlines()
+            )
+            if barcodes != expected_barcodes:
+                raise ValueError(
+                    "barcodes for split %s did not match reference", split_name
+                )
+        else:
+            Path("split_reference").mkdir(exist_ok=True)
+            Path(f"split_reference/{split_name}.txt").write_text("\n".join(barcodes))
+
+    for split_1, split_2 in (("train", "val"), ("train", "test"), ("val", "test")):
+        if split_barcodes[split_1].intersection(split_barcodes[split_2]):
+            raise ValueError("splits %s and %s intersect", split_1, split_2)
+
+    MODEL_DIR = init_model_dir(MODEL_BASE_DIR / (name if name else "model"))
 
     config = Config(
         name=name or MODEL_DIR.name,
@@ -552,57 +616,50 @@ def main(
         metrics=get_metrics(threshold=0.5, num_classes=category_count),
     )
     model.summary()
-
-    plot_model(
-        model,
-        show_shapes=True,
-        show_layer_names=True,
-        to_file=str(MODEL_DIR / "model.png"),
-    )
-
-    ds_val = (
-        load_dataset(
-            "off_categories", split=VAL_SPLIT, features=features, as_supervised=True
-        )
-        .apply(categories_encode)
-        .padded_batch(config.batch_size)
-        .prefetch(tf.data.AUTOTUNE)
-    )
-
     WEIGHTS_DIR = MODEL_DIR / "weights"
     WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
-    model.fit(
-        ds_train,
-        epochs=config.epochs,
-        validation_data=ds_val,
-        callbacks=[
-            callbacks.TerminateOnNaN(),
-            callbacks.ModelCheckpoint(
-                filepath=str(
-                    WEIGHTS_DIR / "weights.{epoch:02d}-{val_f1_score_micro:.4f}"
+
+    if not dry_run:
+        plot_model(
+            model,
+            show_shapes=True,
+            show_layer_names=True,
+            to_file=str(MODEL_DIR / "model.png"),
+        )
+
+        ds_val = (
+            load_dataset(
+                "off_categories", split=VAL_SPLIT, features=features, as_supervised=True
+            )
+            .apply(categories_encode)
+            .padded_batch(config.batch_size)
+            .prefetch(tf.data.AUTOTUNE)
+        )
+
+        model.fit(
+            ds_train,
+            epochs=config.epochs,
+            validation_data=ds_val,
+            callbacks=[
+                callbacks.TerminateOnNaN(),
+                callbacks.ModelCheckpoint(
+                    filepath=str(
+                        WEIGHTS_DIR / "weights.{epoch:02d}-{val_f1_score_micro:.4f}"
+                    ),
+                    monitor="val_f1_score_micro",
+                    save_best_only=True,
+                    save_weights_only=True,
+                    mode="max",
                 ),
-                monitor="val_f1_score_micro",
-                save_best_only=True,
-                save_weights_only=True,
-                mode="max",
-            ),
-            callbacks.CSVLogger(str(MODEL_DIR / "training.log")),
-            callbacks.History(),
-            callbacks.TensorBoard(
-                log_dir="{}/logs".format(MODEL_DIR),
-                write_graph=False,
-            ),
-            WandbMetricsLogger(),
-        ],
-    )
-
-    SAVED_MODEL_DIR = MODEL_DIR / "saved_model"
-
-    @tf.function
-    def serving_func(model, model_spec, category_vocab):
-        model_args, model_kwargs = model_spec
-        preds = model(*model_args, **model_kwargs)
-        return preds, category_vocab
+                callbacks.CSVLogger(str(MODEL_DIR / "training.log")),
+                callbacks.History(),
+                callbacks.TensorBoard(
+                    log_dir="{}/logs".format(MODEL_DIR),
+                    write_graph=False,
+                ),
+                WandbMetricsLogger(),
+            ],
+        )
 
     checkpoint_path = get_best_checkpoint(WEIGHTS_DIR)
     if checkpoint_path is not None:
@@ -611,6 +668,7 @@ def main(
     else:
         print("No checkpoint file found!")
 
+    SAVED_MODEL_DIR = MODEL_DIR / "saved_model"
     save_model(
         SAVED_MODEL_DIR,
         model,
@@ -622,29 +680,53 @@ def main(
 
     m, labels = load_model(SAVED_MODEL_DIR)
 
-    ds_test = load_dataset("off_categories", split=TEST_SPLIT)
-    preds_test = m.predict(ds_test.padded_batch(config.batch_size))
+    for split_name, split_command in (("val", VAL_SPLIT), ("test", TEST_SPLIT)):
+        split_ds = load_dataset("off_categories", split=split_command)
+        preds = m.predict(split_ds.padded_batch(config.batch_size))
+        # This is the function exported as the default serving function in our saved model
+        top_preds = top_labeled_predictions(preds, labels, k=10)
+        # Same data, but pretty
+        pred_table = top_predictions_table(top_preds)
 
-    # This is the function exported as the default serving function in our saved model
-    top_preds_test = top_labeled_predictions(preds_test, labels, k=10)
-    # Same data, but pretty
-    pred_table_test = top_predictions_table(top_preds_test)
-
-    # Add some interpretable features to the final table
-    # Table must be row-aligned with predictions above (= taken from same data sample)
-    extra_cols_test = as_dataframe(
-        select_features(
-            ds_test,
-            ["code", "product_name"] + list(NUTRIMENT_NAMES),
+        # Add some interpretable features to the final table
+        # Table must be row-aligned with predictions above (= taken from same data sample)
+        extra_cols = as_dataframe(
+            select_features(
+                split_ds,
+                ["code", "product_name"] + list(NUTRIMENT_NAMES),
+            )
         )
-    )
 
-    output_df = pd.concat([extra_cols_test, pred_table_test], axis=1)
-    output_df.to_csv(MODEL_DIR / "test_predictions.tsv", sep="\t", index=False)
-    wandb_run.log({"predictions_test": wandb.Table(dataframe=output_df)})
+        output_df = pd.concat([extra_cols, pred_table], axis=1)
+        output_df.to_csv(
+            MODEL_DIR / f"{split_name}_predictions.tsv", sep="\t", index=False
+        )
+        if not m._is_compiled:
+            m.compile(
+                optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                loss=tf.keras.losses.BinaryCrossentropy(
+                    label_smoothing=config.label_smoothing
+                ),
+                metrics=get_metrics(threshold=0.5, num_classes=category_count),
+            )
+        print(f"[yellow]evaluating best model on split {split_name}[/yellow]")
+        best_model_metrics = {
+            f"epoch/{split_name}_{metric_name}": value
+            for metric_name, value in m.evaluate(
+                split_ds.padded_batch(config.batch_size), return_dict=True
+            ).items()
+        }
+        print("[red]best model metrics[/red]")
+        print(best_model_metrics)
+        if wandb_run:
+            wandb.log(best_model_metrics)
+            wandb_run.log(
+                {f"predictions_{split_name}": wandb.Table(dataframe=output_df)}
+            )
 
-    # codecarbon - stop tracking
-    tracker.stop()
+    if tracker:
+        # codecarbon - stop tracking
+        tracker.stop()
 
 
 if __name__ == "__main__":
