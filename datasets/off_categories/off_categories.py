@@ -51,9 +51,9 @@ _RELEASE_NOTES = {
 
 # Don't forget to run `tfds build --register_checksums` when changing the data source
 _DATA_URLS = {
-    "product_data": "https://openfoodfacts.org/data/dataforgood2022/big/v3/predict_categories_dataset_products.jsonl.gz",
-    "image_ocr": "https://openfoodfacts.org/data/dataforgood2022/big/v3/predict_categories_dataset_ocrs.jsonl.gz",
-    "image_embedding": "https://openfoodfacts.org/data/dataforgood2022/big/v3/predict_categories_dataset_image_embeddings.hdf5",
+    "product_data": "https://openfoodfacts.org/data/dataforgood2022/big/v4/predict_categories_dataset_products.jsonl.gz",
+    "image_ocr": "https://openfoodfacts.org/data/dataforgood2022/big/v4/predict_categories_dataset_ocrs.jsonl.gz",
+    "image_embedding": "https://openfoodfacts.org/data/dataforgood2022/big/v4/predict_categories_dataset_image_embeddings.hdf5",
 }
 
 TEXT_EMBEDDING_DIM = 768
@@ -192,9 +192,8 @@ class OffCategories(tfds.core.GeneratorBasedBuilder):
                 {k: f.spec for k, f in _FEATURES.items()}
             ),
             supervised_keys=({k: k for k in _FEATURES.keys() if k != _LABEL}, _LABEL),
-            # Shuffle is deterministic as long as the split names stay the same
-            # (split_name is used internally as hashing salt in the shuffler)
-            disable_shuffling=False,
+            # As adding new files
+            disable_shuffling=True,
             homepage="https://github.com/openfoodfacts/off-category-classification",
         )
 
