@@ -687,36 +687,10 @@ def main(
                 ["code", "product_name"] + list(NUTRIMENT_NAMES),
             )
         )
-
         output_df = pd.concat([extra_cols, pred_table], axis=1)
         output_df.to_csv(
             PREDICTION_DIR / f"{split_name}_top_predictions.tsv", sep="\t", index=False
         )
-        if not m._is_compiled:
-            m.compile(
-                optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                loss=tf.keras.losses.BinaryCrossentropy(
-                    label_smoothing=config.label_smoothing
-                ),
-                metrics=get_metrics(threshold=0.5, num_classes=category_count),
-            )
-        print(f"[yellow]evaluating best model on split {split_name}[/yellow]")
-        best_model_metrics = {
-            f"epoch/{split_name}_{metric_name}": value
-            for metric_name, value in m.evaluate(
-                load_dataset(
-                    "off_categories",
-                    split=split_command,
-                    features=features,
-                    as_supervised=True,
-                ).padded_batch(config.batch_size),
-                return_dict=True,
-            ).items()
-        }
-        print("[red]best model metrics[/red]")
-        print(best_model_metrics)
-        if wandb_run:
-            wandb.log(best_model_metrics)
 
     if tracker:
         # codecarbon - stop tracking
