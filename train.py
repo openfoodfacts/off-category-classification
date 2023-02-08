@@ -671,9 +671,7 @@ def main(
     PREDICTION_DIR = MODEL_DIR / "predictions"
     PREDICTION_DIR.mkdir()
     for split_name, split_command in (("val", VAL_SPLIT), ("test", TEST_SPLIT)):
-        split_ds = load_dataset(
-            "off_categories", split=split_command, features=features
-        )
+        split_ds = load_dataset("off_categories", split=split_command)
         preds = m.predict(split_ds.padded_batch(config.batch_size))
         np.save(PREDICTION_DIR / split_name, preds, allow_pickle=False)
         # This is the function exported as the default serving function in our saved model
