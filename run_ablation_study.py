@@ -14,6 +14,7 @@ import datasets.off_categories
 from lib.constant import NUTRIMENT_NAMES
 from lib.dataset import load_dataset, select_feature
 from lib.io import load_model
+from lib.metrics import PrecisionWithAverage, RecallWithAverage
 
 PREPROC_BATCH_SIZE = 25_000  # some large value, only affects execution time
 
@@ -123,7 +124,13 @@ def main(
     builder.download_and_prepare()
 
     SAVED_MODEL_DIR = model_dir / "saved_model"
-    m, labels = load_model(SAVED_MODEL_DIR)
+    m, labels = load_model(
+        SAVED_MODEL_DIR,
+        custom_objects={
+            "PrecisionWithAverage": PrecisionWithAverage,
+            "RecallWithAverage": RecallWithAverage,
+        },
+    )
 
     for split_name, split_command in (("val", VAL_SPLIT), ("test", TEST_SPLIT)):
         split_ds = load_dataset("off_categories", split=split_command)
