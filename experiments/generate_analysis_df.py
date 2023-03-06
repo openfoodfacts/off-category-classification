@@ -188,6 +188,12 @@ for split_name in ("val", "test"):
             raise ValueError("labels changed between models!")
 
         predictions_dir = model_dir / "predictions"
+        pred_file_path = predictions_dir / f"{split_name}.npy"
+
+        if not pred_file_path.exists():
+            print(f"{pred_file_path} not found, skipping")
+            continue
+
         y_pred = np.load(predictions_dir / f"{split_name}.npy")
         print(f"shape of predictions: {y_pred.shape}")
         output_df_path = predictions_dir / f"{split_name}_df.pkl"
