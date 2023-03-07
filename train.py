@@ -18,7 +18,7 @@ from wandb.keras import WandbMetricsLogger
 
 import datasets.off_categories
 import wandb
-from lib.constant import IMAGE_EMBEDDING_DIM, NUTRIMENT_NAMES
+from lib.constant import IMAGE_EMBEDDING_DIM, MAX_IMAGE_EMBEDDING, NUTRIMENT_NAMES
 from lib.dataset import (
     as_dataframe,
     flat_batch,
@@ -293,6 +293,26 @@ def serving_func(model, model_spec, category_vocab):
     return preds, tf.constant(category_vocab, dtype="string")
 
 
+def fix_image_embeddings_mask(ds: tf.data.Dataset):
+    """Fix image_embeddings_mask by always setting a non-zero element in the mask.
+    Otherwise, we get NaN error after GlobalAveragePooling1D."""
+
+    def map_func(x, y):
+        image_embeddings_mask = x.pop("image_embeddings_mask")
+
+        if tf.math.reduce_all(image_embeddings_mask == 0):
+            image_embeddings_mask = tf.constant(
+                [1] + [0] * (MAX_IMAGE_EMBEDDING - 1), dtype=tf.int64
+            )
+
+        return {
+            **x,
+            "image_embeddings_mask": image_embeddings_mask,
+        }, y
+
+    return ds.map(map_func)
+
+
 def main(
     mixed_precision: bool = typer.Option(
         False, help="If True, used mixed precision training"
@@ -394,6 +414,9 @@ def main(
     dry_run: bool = typer.Option(
         False, help="Perform a dry run (no training, no integration logging)"
     ),
+    wandb_track: bool = typer.Option(
+        True, help="If True, activate wandb training tracking"
+    ),
 ):
     MODEL_BASE_DIR = PROJECT_DIR / "experiments" / "trainings"
     MODEL_BASE_DIR.mkdir(parents=True, exist_ok=True)
@@ -401,7 +424,6 @@ def main(
     if dry_run:
         print("[green]Running in DRY RUN mode[/green]")
         tracker = None
-        wandb_run = None
     else:
         print("Setting up carbon emission tracking")
         tracker = EmissionsTracker(
@@ -485,13 +507,14 @@ def main(
         cosine_scheduler=cosine_scheduler,
     )
 
-    wandb_run = wandb.init(
-        project="product-categorization",
-        name=config.name,
-        config=dataclasses.asdict(config),
-        notes=notes,
-        tags=tags,
-    )
+    if wandb_track:
+        wandb.init(
+            project="product-categorization",
+            name=config.name,
+            config=dataclasses.asdict(config),
+            notes=notes,
+            tags=tags,
+        )
 
     with (MODEL_DIR / "config.json").open("w") as f:
         json.dump(dataclasses.asdict(config), f, indent=4)
@@ -587,6 +610,9 @@ def main(
         load_dataset(
             "off_categories", split=TRAIN_SPLIT, features=features, as_supervised=True
         )
+        .apply(
+            fix_image_embeddings_mask if add_image_embedding_input else lambda ds: ds
+        )
         .apply(categories_encode)
         .padded_batch(config.batch_size)
         .prefetch(tf.data.AUTOTUNE)
@@ -620,6 +646,11 @@ def main(
             load_dataset(
                 "off_categories", split=VAL_SPLIT, features=features, as_supervised=True
             )
+            .apply(
+                fix_image_embeddings_mask
+                if add_image_embedding_input
+                else lambda ds: ds
+            )
             .apply(categories_encode)
             .padded_batch(config.batch_size)
             .prefetch(tf.data.AUTOTUNE)
@@ -646,8 +677,8 @@ def main(
                     log_dir="{}/logs".format(MODEL_DIR),
                     write_graph=False,
                 ),
-                WandbMetricsLogger(),
-            ],
+            ]
+            + ([WandbMetricsLogger()] if wandb_track else []),
         )
 
     checkpoint_path = get_best_checkpoint(WEIGHTS_DIR)
@@ -671,7 +702,9 @@ def main(
     PREDICTION_DIR = MODEL_DIR / "predictions"
     PREDICTION_DIR.mkdir()
     for split_name, split_command in (("val", VAL_SPLIT), ("test", TEST_SPLIT)):
-        split_ds = load_dataset("off_categories", split=split_command)
+        split_ds = load_dataset("off_categories", split=split_command).apply(
+            fix_image_embeddings_mask if add_image_embedding_input else lambda ds: ds
+        )
         preds = m.predict(split_ds.padded_batch(config.batch_size))
         np.save(PREDICTION_DIR / split_name, preds, allow_pickle=False)
         # This is the function exported as the default serving function in our saved model

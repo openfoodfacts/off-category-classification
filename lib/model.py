@@ -113,9 +113,6 @@ def build_attention_over_sequence_layer(
     average_output = tf.keras.layers.GlobalAveragePooling1D()(
         attention_output, image_embedding_mask_input
     )
-    average_output = tf.keras.layers.Lambda(replace_nan_by_zero, name="nan_remover")(
-        average_output
-    )
     return [image_embedding_input, image_embedding_mask_input], [
         attention_output,
         attention_scores,

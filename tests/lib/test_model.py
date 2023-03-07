@@ -1,7 +1,10 @@
+import sys
+
 import numpy as np
 import pytest
 import tensorflow as tf
 
+sys.path.insert(0, "/home/raphael/Projects/off-category-classification")
 from lib.model import (
     build_attention_over_sequence_layer,
     generate_mask_matrix,
@@ -70,8 +73,8 @@ def test_build_attention_over_sequence_layer():
     ).all()
     assert average_output.shape == (batch_size, embedding_dim)
     # as we masked all embeddings for 2nd element in batch, we expect an
-    # average output of zero
-    assert (average_output.numpy()[1] == 0.0).all()
+    # NaN output. This should not occur during training.
+    assert np.isnan(average_output.numpy()[1]).all()
 
 
 def test_transform_image_embeddings():
