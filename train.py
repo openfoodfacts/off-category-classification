@@ -664,7 +664,7 @@ def main(
                 callbacks.TerminateOnNaN(),
                 callbacks.ModelCheckpoint(
                     filepath=str(
-                        WEIGHTS_DIR / "weights.{epoch:02d}-{val_f1_score_micro:.4f}"
+                        WEIGHTS_DIR / "weights.{epoch:03d}-{val_f1_score_micro:.4f}"
                     ),
                     monitor="val_f1_score_micro",
                     save_best_only=True,
