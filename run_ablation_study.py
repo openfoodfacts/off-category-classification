@@ -4,17 +4,17 @@ from pathlib import Path
 from typing import List
 
 import numpy as np
-import tensorflow as tf
 import tensorflow_datasets as tfds
 import typer
 from rich import print
 from sklearn.metrics import classification_report
 
 import datasets.off_categories
-from lib.constant import NUTRIMENT_NAMES
+from lib.constant import IMAGE_EMBEDDING_DIM, MAX_IMAGE_EMBEDDING, NUTRIMENT_NAMES
 from lib.dataset import load_dataset, select_feature
 from lib.io import load_model
 from lib.metrics import PrecisionWithAverage, RecallWithAverage
+from lib.preprocessing import fix_image_embeddings_mask
 
 PREPROC_BATCH_SIZE = 25_000  # some large value, only affects execution time
 
@@ -67,6 +67,17 @@ def remove_product_name_func(x):
     return x
 
 
+def remove_image_embeddings_func(x):
+    x = copy.copy(x)
+    x["image_embeddings"] = np.zeros(
+        (MAX_IMAGE_EMBEDDING, IMAGE_EMBEDDING_DIM), dtype=np.float32
+    )
+    x["image_embeddings_mask"] = np.array(
+        [1] + [0] * (MAX_IMAGE_EMBEDDING - 1), dtype=np.int64
+    )
+    return x
+
+
 def main(
     model_dir: Path = typer.Option(..., help="name of the model"),
     remove_ingredient_ocr_tags: bool = typer.Option(
@@ -80,6 +91,9 @@ def main(
     ),
     remove_product_name: bool = typer.Option(
         False, help="Remove product name inputs from dataset (ablation)"
+    ),
+    remove_image_embedding: bool = typer.Option(
+        False, help="Remove image embedding inputs from dataset (ablation)"
     ),
 ):
     MODEL_BASE_DIR = model_dir.parent
@@ -132,8 +146,12 @@ def main(
         },
     )
 
+    has_image_embedding = any(i.name == "image_embeddings" for i in m.inputs)
+
     for split_name, split_command in (("val", VAL_SPLIT), ("test", TEST_SPLIT)):
-        split_ds = load_dataset("off_categories", split=split_command)
+        split_ds = load_dataset("off_categories", split=split_command).apply(
+            fix_image_embeddings_mask if has_image_embedding else lambda ds: ds
+        )
 
         suffixes = []
         if remove_ingredient_ocr_tags:
@@ -148,6 +166,9 @@ def main(
         if remove_product_name:
             suffixes.append("product_name")
             split_ds = split_ds.map(remove_product_name_func)
+        if remove_image_embedding:
+            suffixes.append("image_embeddings")
+            split_ds = split_ds.map(remove_image_embeddings_func)
 
         y_pred = m.predict(split_ds.padded_batch(32))
         y_pred_binary = np.zeros(y_pred.shape, dtype=int)

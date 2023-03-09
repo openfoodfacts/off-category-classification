@@ -35,6 +35,10 @@ from lib.model import (
     top_labeled_predictions,
     top_predictions_table,
 )
+from lib.preprocessing import (
+    fix_image_embeddings_mask,
+    fix_image_embeddings_mask_supervised,
+)
 from lib.taxonomy import get_taxonomy
 
 PREPROC_BATCH_SIZE = 25_000  # some large value, only affects execution time
@@ -291,52 +295,6 @@ def serving_func(model, model_spec, category_vocab):
     model_args, model_kwargs = model_spec
     preds = model(*model_args, **model_kwargs)
     return preds, tf.constant(category_vocab, dtype="string")
-
-
-def fix_image_embeddings_mask_supervised(ds: tf.data.Dataset):
-    """Fix image_embeddings_mask by always setting a non-zero element in the mask.
-    Otherwise, we get NaN error after GlobalAveragePooling1D.
-
-    Version for supervised (with (x, y)) datasets.
-    """
-
-    def map_func(x, y):
-        image_embeddings_mask = x.pop("image_embeddings_mask")
-
-        if tf.math.reduce_all(image_embeddings_mask == 0):
-            image_embeddings_mask = tf.constant(
-                [1] + [0] * (MAX_IMAGE_EMBEDDING - 1), dtype=tf.int64
-            )
-
-        return {
-            **x,
-            "image_embeddings_mask": image_embeddings_mask,
-        }, y
-
-    return ds.map(map_func)
-
-
-def fix_image_embeddings_mask(ds: tf.data.Dataset):
-    """Fix image_embeddings_mask by always setting a non-zero element in the mask.
-    Otherwise, we get NaN error after GlobalAveragePooling1D.
-
-    Version for not supervised (with x only as input) datasets.
-    """
-
-    def map_func(x):
-        image_embeddings_mask = x.pop("image_embeddings_mask")
-
-        if tf.math.reduce_all(image_embeddings_mask == 0):
-            image_embeddings_mask = tf.constant(
-                [1] + [0] * (MAX_IMAGE_EMBEDDING - 1), dtype=tf.int64
-            )
-
-        return {
-            **x,
-            "image_embeddings_mask": image_embeddings_mask,
-        }
-
-    return ds.map(map_func)
 
 
 def main(

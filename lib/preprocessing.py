@@ -5,11 +5,12 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
+import tensorflow as tf
 from flashtext import KeywordProcessor
 
 from lib.taxonomy import Taxonomy
 
-from .constant import EXCLUDE_LIST_CATEGORIES
+from .constant import EXCLUDE_LIST_CATEGORIES, MAX_IMAGE_EMBEDDING
 from .text_utils import fold, get_tag
 
 
@@ -263,3 +264,49 @@ def transform_image_embeddings_mask(
     mask = np.zeros(max_images, dtype=np.int64)
     mask[:number_images] = 1
     return mask
+
+
+def fix_image_embeddings_mask_supervised(ds: tf.data.Dataset):
+    """Fix image_embeddings_mask by always setting a non-zero element in the mask.
+    Otherwise, we get NaN error after GlobalAveragePooling1D.
+
+    Version for supervised (with (x, y)) datasets.
+    """
+
+    def map_func(x, y):
+        image_embeddings_mask = x.pop("image_embeddings_mask")
+
+        if tf.math.reduce_all(image_embeddings_mask == 0):
+            image_embeddings_mask = tf.constant(
+                [1] + [0] * (MAX_IMAGE_EMBEDDING - 1), dtype=tf.int64
+            )
+
+        return {
+            **x,
+            "image_embeddings_mask": image_embeddings_mask,
+        }, y
+
+    return ds.map(map_func)
+
+
+def fix_image_embeddings_mask(ds: tf.data.Dataset):
+    """Fix image_embeddings_mask by always setting a non-zero element in the mask.
+    Otherwise, we get NaN error after GlobalAveragePooling1D.
+
+    Version for not supervised (with x only as input) datasets.
+    """
+
+    def map_func(x):
+        image_embeddings_mask = x.pop("image_embeddings_mask")
+
+        if tf.math.reduce_all(image_embeddings_mask == 0):
+            image_embeddings_mask = tf.constant(
+                [1] + [0] * (MAX_IMAGE_EMBEDDING - 1), dtype=tf.int64
+            )
+
+        return {
+            **x,
+            "image_embeddings_mask": image_embeddings_mask,
+        }
+
+    return ds.map(map_func)
