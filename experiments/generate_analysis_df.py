@@ -246,3 +246,14 @@ for model_dir in (p for p in TRAINING_DIR.glob("*") if p.is_dir()):
         )
         with threshold_report_path.open("w") as f:
             json.dump(thresholds, f, indent=4)
+
+        automatically_processable = sum(
+            data["support"] * data["fraction"]
+            for data in thresholds.values()
+            if data["threshold"] is not None and data["support"] >= 30
+        )
+        total = sum(data["support"] for data in thresholds.values())
+        print(
+            f"{automatically_processable} automatically processable "
+            f"(/{total}, {automatically_processable * 100 / total}%)"
+        )
