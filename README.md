@@ -1,50 +1,20 @@
 # Open Food Facts Category Classification
 
-This repository contains the code to train a multi-label category classifier for Open Food Facts products.
+This repository contains the code to train a multi-label category classifier for Open Food Facts products. The latest version of the category classifier model is currently the [v3 model](https://github.com/openfoodfacts/robotoff-models/releases/tag/keras-category-classifier-image-embeddings-3.0).
 
-It works within [Robotoff](https://github.com/openfoodfacts/robotoff), currently using product_name and ingredients_tags.
+It works within [Robotoff](https://github.com/openfoodfacts/robotoff), currently using as input features:
+
+- the product name (`product_name` field)
+- the ingredient list (`ingredients` field): only the ingredients of depth one are considered (sub-ingredients are ignored)
+- the ingredients extracted from OCR texts: all OCR results are fetched and ingredients present in the taxonomy are detected using flashtext library.
+- the most common nutriments: salt, proteins, fats, saturated fats, carbohydrates, energy,...
+- up to the most 10 recent images: we generate an embedding for each image using [clip-vit-base-patch32](https://github.com/openfoodfacts/robotoff-models/releases/tag/clip-vit-base-patch32) model, and generate a single vector using a multi-head attention layer + GlobalAveragePooling1d.
 
 ## Sources
 
-[`download.sh`](./download.sh) can help you download extra data.
+[`train.py`](train.py) is training script. It can last for several hours depending on your machine.
 
-[`experiments/Train.ipynb`](experiments/Train.ipynb) is the notebook to train the model. It can last for several hours depending on your machine.
-
-[Threshold.ipynb notebook](./Threshold.ipynb) tries to measure performance 
-to understand where to set threshold for automatic classification.
-Results are summarized in [2021-10-15-kulizhsy-category-classifier-performance.pdf](./2021-10-15-kulizhsy-category-classifier-performance.pdf)
-
-## Contributing
-
-
-A [Data for Good to add more features to the model has been initiated](https://wiki.openfoodfacts.org/DataForGood-2022). You can find things to help with on issue [What can I work on ?](https://github.com/openfoodfacts/off-category-classification/issues/2)
-
-[![Open Train.py In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openfoodfacts/off-category-classification/blob/master/experiments/Train.ipynb)
-
-### Running jupyter notebook with docker
-
-On first install, or requirements or Dockerfile changes (or in case of doubt), run:
-
-```bash
-docker-compose build
-```
-
-Then simply run:
-
-```bash
-docker-compose up
-```
-
-Look at url displayed on console to open the notebook
-
-
-## Deploying to production
-
-- The output of training should be published on [Robotoff models](https://github.com/openfoodfacts/robotoff-models) as a release.
-- The deployment from Robotoff models releases is already automated,
-  see [robotoff .github/workflows/container-deploy-ml.yml](https://github.com/openfoodfacts/robotoff/blob/master/.github/workflows/container-deploy-ml.yml).
-
-  You  will have to add a ml-xxx tag to trigger deploy
+[`scripts/gen_image_embedding.py`](scripts/gen_image_embedding.py) This script is used to generate the image embeddings used as input for the model, and save the embeddings to an HDF5 file that will be used during training.
 
 ## Dev install
 
@@ -70,9 +40,4 @@ Install requirement and eventually requirement-dev
 ```
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
-```
-
-To launch jupyter notebook, just use (after activating your virtual env):
-```
-jupyter notebook
 ```
